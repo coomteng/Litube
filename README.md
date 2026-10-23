@@ -37,23 +37,24 @@ Download installation packages and read release notes on the [releases page](htt
 
 Report issues with the app version, device model, Android version and steps to reproduce. Include a diagnostic archive when available. Contributions and pull requests are welcome.
 
-## Fork downloads (coomteng/Litube)
+## LitubeX — this fork
 
-Pre-built APKs for every variant are attached to each
-[release of this fork](https://github.com/coomteng/Litube/releases):
+LitubeX is upstream Litube plus performance work (Shorts pre-warm, faster HLS start-up),
+shipped as a **separate app** (`com.coomteng.litube`) so it installs alongside Litube.
+Versions are `<upstream>.<fork revision>`, e.g. 3.0.3.1. Pre-built APKs for every variant
+are attached to each [release](https://github.com/coomteng/Litube/releases):
 
 | file | what |
 |---|---|
-| `litube-<ver>-universal-release.apk` | all ABIs, R8-minified, release-signed — pick this if unsure |
-| `litube-<ver>-arm64-v8a-release.apk` | 64-bit ARM (most phones since ~2017), smallest |
-| `litube-<ver>-armeabi-v7a-release.apk` | 32-bit ARM |
-| `litube-<ver>-x86_64-release.apk`, `-x86-` | emulators / Chromebooks |
-| `litube-<ver>-*-minified-debugsigned.apk` | same R8 build, debug key, package `com.hhst.litube.minified` |
-| `litube-<ver>-*-debug.apk` | unminified, debuggable, package `com.hhst.litube.debug` |
+| `litubex-<ver>-universal-release.apk` | all ABIs, R8-minified, release-signed — pick this if unsure |
+| `litubex-<ver>-arm64-v8a-release.apk` | 64-bit ARM (most phones since ~2017), smallest |
+| `litubex-<ver>-armeabi-v7a-release.apk` | 32-bit ARM |
+| `litubex-<ver>-x86_64-release.apk`, `-x86-` | emulators / Chromebooks |
+| `litubex-<ver>-*-minified-debugsigned.apk` | same R8 build, debug key, package `com.coomteng.litube.minified` |
+| `litubex-<ver>-*-debug.apk` | unminified, debuggable, package `com.coomteng.litube.debug` |
 
-They are built by `.github/workflows/release.yml` on every `v*` tag. Release APKs are
-signed with this fork's own key, so they do not upgrade in place over upstream builds
-(uninstall first, or install side by side via the `.minified`/`.debug` packages).
+They are built by `.github/workflows/release.yml` on every `v*` tag and signed with this
+fork's own key.
 
 Local release builds: `./gradlew assembleRelease -PabiSplits=true` with
 `LITUBE_KEYSTORE`, `LITUBE_KEYSTORE_PASSWORD` (and optionally `LITUBE_KEY_ALIAS`,

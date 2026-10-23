@@ -23,11 +23,15 @@ android {
     compileSdk = 36
 
     defaultConfig {
-        applicationId = "com.hhst.litube"
+        // Fork identity: a different application id so it installs side by side with upstream
+        // Litube (com.hhst.litube). Version = upstream version + ".N" fork revision;
+        // versionCode = upstream code * 100 + N, so both streams stay ordered.
+        applicationId = "com.coomteng.litube"
         minSdk = 23
         targetSdk = 36
-        versionCode = 303
-        versionName = "3.0.3"
+        versionCode = 30301
+        versionName = "3.0.3.1"
+        buildConfigField("String", "FORK_REPO", "\"coomteng/Litube\"")
         buildConfigField("String", "DIAGNOSTIC_BUILD_ID", "\"$diagnosticBuildId\"")
         buildConfigField("String", "DIAGNOSTIC_DEPENDENCIES", "\"Media3=${libs.versions.media3.get()};OkHttp=${libs.versions.okhttp.get()};Gson=${libs.versions.gson.get()};NewPipe=${libs.newpipe.extractor.get().version}\"")
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"

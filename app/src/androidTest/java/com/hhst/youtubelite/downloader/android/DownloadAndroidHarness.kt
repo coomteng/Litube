@@ -137,7 +137,7 @@ internal suspend fun DownloadAndroidHarness.seedList(): SeededTasks {
         completedId,
         0,
         AssetKind.VIDEO,
-        "content://com.hhst.litube.debug.download.fileprovider/downloads/c.mp4",
+        "content://com.coomteng.litube.debug.download.fileprovider/downloads/c.mp4",
     )
 
     val missing = viewModel.enqueue(request("zzzzzzzzzzz", "Missing clip"), "s-miss")
@@ -146,7 +146,7 @@ internal suspend fun DownloadAndroidHarness.seedList(): SeededTasks {
         missingId,
         0,
         AssetKind.VIDEO,
-        "content://com.hhst.litube.debug.download.fileprovider/downloads/m.mp4",
+        "content://com.coomteng.litube.debug.download.fileprovider/downloads/m.mp4",
     )
     coordinator.reportFileAvailability(missingId, 0, AssetKind.VIDEO, FileAvailability.MISSING)
 
@@ -163,7 +163,7 @@ internal suspend fun DownloadAndroidHarness.seedList(): SeededTasks {
         attachmentsId,
         0,
         AssetKind.SUBTITLE,
-        "content://com.hhst.litube.debug.download.fileprovider/downloads/a.en.vtt",
+        "content://com.coomteng.litube.debug.download.fileprovider/downloads/a.en.vtt",
     )
     return SeededTasks(runningBatchId = running.batchId)
 }

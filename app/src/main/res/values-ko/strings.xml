@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">Litube</string>
+    <string name="app_name">LitubeX</string>
     <string name="player_audio_only">백그라운드에서 듣기</string>
     <string name="back_again_to_exit">뒤로 가기를 한 번 더 누르면 종료됩니다</string>
     <string name="navigate_back">뒤로</string>

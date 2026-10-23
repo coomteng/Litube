@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">Litube</string>
+    <string name="app_name">LitubeX</string>
     <string name="player_audio_only">నేపథ్యంలో వినండి</string>
     <string name="back_again_to_exit">నిష్క్రమించడానికి మళ్లీ వెనుకకు నొక్కండి</string>
     <string name="navigate_back">వెనుకకు</string>

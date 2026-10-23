@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">Litube</string>
+    <string name="app_name">LitubeX</string>
     <string name="player_audio_only">Lyssna i bakgrunden</string>
     <string name="back_again_to_exit">Tryck tillbaka igen för att avsluta</string>
     <string name="navigate_back">Tillbaka</string>

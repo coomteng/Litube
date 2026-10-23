@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">Litube</string>
+    <string name="app_name">LitubeX</string>
     <string name="player_audio_only">পটভূমিত শুনক</string>
     <string name="back_again_to_exit">প্ৰস্থান কৰিবলৈ আকৌ পিছলৈ টিপক</string>
     <string name="navigate_back">পিছলৈ</string>

@@ -89,7 +89,7 @@ jobs:
               adb logcat -d > device-results/logcat.txt || true
               adb shell dumpsys window > device-results/windows.txt || true
               adb pull /data/local/tmp/device-evidence device-results/evidence > /dev/null 2>&1 || true
-              for package in com.hhst.litube.debug com.hhst.litube.minified; do
+              for package in com.coomteng.litube.debug com.coomteng.litube.minified; do
                 adb pull "/data/user/0/$package/files/device-evidence" "device-results/$package" > /dev/null 2>&1 || true
               done
             }
@@ -159,12 +159,12 @@ jobs:
             printf -v class_list '%s,' "${classes[@]}"
             status=0
             install_apks debug
-            run_suite com.hhst.litube.debug "${class_list%,}" offline || status=1
-            run_suite com.hhst.litube.debug \
+            run_suite com.coomteng.litube.debug "${class_list%,}" offline || status=1
+            run_suite com.coomteng.litube.debug \
               com.hhst.youtubelite.player.engine.PipAudioOnlyAndroidTest \
               pip-audio || status=1
             install_apks minifiedDebug
-            run_suite com.hhst.litube.minified \
+            run_suite com.coomteng.litube.minified \
               com.hhst.youtubelite.player.sponsor.SponsorBlockMinifiedAndroidTest \
               sponsorblock-r8 com.hhst.youtubelite.player.sponsor.R8VerificationRunner || status=1
             exit "$status"

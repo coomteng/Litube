@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">Litube</string>
+    <string name="app_name">LitubeX</string>
     <string name="player_audio_only">பின்னணியில் கேளுங்கள்</string>
     <string name="back_again_to_exit">வெளியேற மீண்டும் மீண்டும் அழுத்தவும்</string>
     <string name="navigate_back">மீண்டும்</string>

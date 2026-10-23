@@ -72,15 +72,15 @@ jobs:
             base=$(basename "$f" .apk)                     # app-arm64-v8a-release[-unsigned] | app-universal-release
             abi=${base#app-}; abi=${abi%-release}; abi=${abi%-release-unsigned}
             signed=release; [[ "$base" == *-unsigned ]] && signed=release-unsigned
-            cp "$f" "$out/litube-${version}-${abi}-${signed}.apk"
+            cp "$f" "$out/litubex-${version}-${abi}-${signed}.apk"
           done
           for f in app/build/outputs/apk/minifiedDebug/*.apk; do
             base=$(basename "$f" .apk); abi=${base#app-}; abi=${abi%-minifiedDebug}
-            cp "$f" "$out/litube-${version}-${abi}-minified-debugsigned.apk"
+            cp "$f" "$out/litubex-${version}-${abi}-minified-debugsigned.apk"
           done
           for f in app/build/outputs/apk/debug/*.apk; do
             base=$(basename "$f" .apk); abi=${base#app-}; abi=${abi%-debug}
-            cp "$f" "$out/litube-${version}-${abi}-debug.apk"
+            cp "$f" "$out/litubex-${version}-${abi}-debug.apk"
           done
           [ -d app/build/outputs/mapping/release ] && (cd app/build/outputs/mapping/release && zip -qr "$GITHUB_WORKSPACE/$out/mapping-release-${version}.zip" .)
           (cd "$out" && sha256sum *.apk > SHA256SUMS.txt)
@@ -105,12 +105,12 @@ jobs:
           | \`*-arm64-v8a-release.apk\` | 64-bit ARM (most phones since ~2017), smallest download |
           | \`*-armeabi-v7a-release.apk\` | 32-bit ARM (older/budget phones) |
           | \`*-x86_64-release.apk\` / \`*-x86-release.apk\` | emulators, Chromebooks |
-          | \`*-minified-debugsigned.apk\` | same R8 build, debug-signed, package \`com.hhst.litube.minified\` (installs side by side) |
-          | \`*-debug.apk\` | unminified, debuggable, package \`com.hhst.litube.debug\` |
+          | \`*-minified-debugsigned.apk\` | same R8 build, debug-signed, package \`com.coomteng.litube.minified\` (installs side by side) |
+          | \`*-debug.apk\` | unminified, debuggable, package \`com.coomteng.litube.debug\` |
 
-          \`SHA256SUMS.txt\` lists every file. Release-signed APKs upgrade in place only over APKs signed with the same key (this fork's key, not upstream's)."
+          \`SHA256SUMS.txt\` lists every file. LitubeX is a separate app (package \`com.coomteng.litube\`): it installs next to upstream Litube and does not replace it."
           if gh release view "$TAG" >/dev/null 2>&1; then
             gh release upload "$TAG" dist/* --clobber
           else
-            gh release create "$TAG" dist/* --title "Litube $TAG" --notes "$notes" --prerelease
+            gh release create "$TAG" dist/* --title "LitubeX $TAG" --notes "$notes" --prerelease
           fi
