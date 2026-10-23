@@ -179,7 +179,11 @@ class YoutubeHttpDataSource private constructor(
         }
 
         inputStream = try {
-            resp.body?.byteStream()?.let { if (compressed) GZIPInputStream(it) else it }
+            resp.body?.byteStream()?.let { raw ->
+                // Inflate through a 64 KiB window: the default 512-byte inflater buffer makes a
+                // multi-megabyte playlist cost thousands of tiny reads through the data-source chain.
+                if (compressed) java.io.BufferedInputStream(GZIPInputStream(raw, 64 * 1024), 64 * 1024) else raw
+            }
                 ?: throw IOException("Empty response body")
         } catch (e: IOException) {
             closeQuietly()

@@ -47,6 +47,19 @@ class YoutubeMediaRequestsTest {
         } finally { server.shutdown() }
     }
 
+    @Test fun manifestRequestsAcceptGzipButMediaStaysIdentity() {
+        val policy = YoutubeMediaRequests({ true }, ExtractionDiagnostics())
+        val plan = RequestPlan(session(), ClientProfile.VISIONOS, RequestPlan.Protocol.HLS, RequestPlan.Range.NONE, false)
+        // googlevideo serves a 1.6 MB VOD media playlist as 26 KB gzip; byte-range media must stay identity
+        // so Content-Length/Content-Range keep describing the bytes on the wire.
+        assertEquals("gzip", policy.build("https://manifest.googlevideo.com/api/manifest/hls_playlist/expire/1/x", plan).header("Accept-Encoding"))
+        assertEquals("gzip", policy.build("https://manifest.googlevideo.com/api/manifest/hls_variant/expire/1/x", plan).header("Accept-Encoding"))
+        assertEquals("gzip", policy.build("https://manifest.googlevideo.com/api/manifest/dash/expire/1/x", plan).header("Accept-Encoding"))
+        assertEquals("identity", policy.build("https://rr1---sn-x.googlevideo.com/videoplayback/id/1/itag/22", plan).header("Accept-Encoding"))
+        val ranged = RequestPlan(session(), ClientProfile.WEB, RequestPlan.Protocol.HTTPS, RequestPlan.Range.HEADER, true)
+        assertEquals("identity", policy.build("https://rr1---sn-x.googlevideo.com/videoplayback?itag=22", ranged, 0, 1024).header("Accept-Encoding"))
+    }
+
     @Test fun rangeIsBoundedAndIdentityChangeRejectsRequest() {
         var current = true
         val policy = YoutubeMediaRequests({ current }, ExtractionDiagnostics())

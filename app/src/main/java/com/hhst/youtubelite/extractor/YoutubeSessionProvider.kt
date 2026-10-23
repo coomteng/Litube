@@ -55,6 +55,7 @@ class YoutubeSessionProvider(context: Context, private val http: OkHttpClient,
     private data class IdentityHint(val cookies: String, val userAgent: String, val route: Long, val value: String)
     @Volatile private var identityHint: IdentityHint? = null
     private val mediaCookies = MediaCookieIdentity()
+    private val originCookies = CachedCookieReader { CookieManager.getInstance().getCookie(ORIGIN).orEmpty() }
     private data class BrowserConfig(val value: JsonObject, val scope: String, val generation: Long,
                                      val document: () -> Long, val capturedAt: Long)
 
@@ -236,7 +237,7 @@ class YoutubeSessionProvider(context: Context, private val http: OkHttpClient,
     /** A safe reason code, never a cookie, account identifier or network address. */
     fun mediaInvalidationReason(session: YoutubeSession): String? = when {
         session.networkGeneration != networkGeneration.get() -> "network_route_changed"
-        !mediaCookies.matches(session.cookies(ORIGIN), CookieManager.getInstance().getCookie(ORIGIN).orEmpty()) -> "account_cookie_changed"
+        !mediaCookies.matches(session.cookies(ORIGIN), originCookies.get()) -> "account_cookie_changed"
         else -> null
     }
 

@@ -1,6 +1,7 @@
 package com.hhst.youtubelite.extractor
 
 import okhttp3.HttpUrl.Companion.toHttpUrl
+import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.Executors
@@ -54,7 +55,11 @@ class YoutubeMediaRequests(
         plan.headers.forEach { (name, value) -> builder.header(name, value) }
         extraHeaders.filterKeys { it.lowercase() !in setOf("authorization", "cookie", "user-agent", "range") }
             .forEach { (name, value) -> builder.header(name, value) }
-        builder.header("User-Agent", plan.userAgent).header("Accept-Encoding", "identity")
+        // Media bytes stay identity: Content-Length/Content-Range must describe the bytes on the
+        // wire for the range window checks. Manifests are text and googlevideo gzips them ~60:1
+        // (a 1.6 MB VOD media playlist is 26 KB compressed), so let the playlist requests opt in.
+        builder.header("User-Agent", plan.userAgent)
+            .header("Accept-Encoding", if (isManifestUrl(url)) "gzip" else "identity")
         val cookies = plan.cookies(url)
         if (cookies.isNotEmpty()) builder.header("Cookie", cookies)
         if (range != RequestPlan.Range.NONE && limit > 0) {
@@ -69,6 +74,10 @@ class YoutubeMediaRequests(
         return if (learnedPost && plan.allowPostFallback) builder.post(byteArrayOf(0x78, 0).toRequestBody()).build()
             else builder.get().build()
     }
+
+    /** googlevideo manifest endpoints (HLS variant/media playlists, DASH MPD). */
+    private fun isManifestUrl(url: String): Boolean =
+        url.toHttpUrlOrNull()?.let { it.host.startsWith("manifest.") && it.encodedPath.startsWith("/api/manifest/") } == true
 
     fun interceptor() = Interceptor { chain ->
         val initial = chain.request()
