@@ -33,6 +33,21 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
+    // Release signing from the environment (LITUBE_KEYSTORE, LITUBE_KEYSTORE_PASSWORD,
+    // LITUBE_KEY_ALIAS, LITUBE_KEY_PASSWORD). Unset -> release stays unsigned, as before.
+    val releaseKeystore = System.getenv("LITUBE_KEYSTORE")?.takeIf { it.isNotBlank() }?.let(::file)
+    if (releaseKeystore != null) {
+        signingConfigs.create("release") {
+            storeFile = releaseKeystore
+            storePassword = System.getenv("LITUBE_KEYSTORE_PASSWORD")
+            keyAlias = System.getenv("LITUBE_KEY_ALIAS") ?: "litube"
+            keyPassword = System.getenv("LITUBE_KEY_PASSWORD") ?: System.getenv("LITUBE_KEYSTORE_PASSWORD")
+            enableV1Signing = true
+            enableV2Signing = true
+            enableV3Signing = true
+        }
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = true
@@ -41,6 +56,7 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro",
             )
+            if (releaseKeystore != null) signingConfig = signingConfigs.getByName("release")
         }
         debug {
             isMinifyEnabled = false
@@ -54,6 +70,19 @@ android {
             applicationIdSuffix = ".minified"
             versionNameSuffix = "-minified"
             matchingFallbacks += listOf("release")
+        }
+    }
+
+    // -PabiSplits=true emits one APK per ABI plus a universal one (release downloads);
+    // the default single universal APK keeps CI and local installs unchanged.
+    if (providers.gradleProperty("abiSplits").orNull == "true") {
+        splits {
+            abi {
+                isEnable = true
+                reset()
+                include("arm64-v8a", "armeabi-v7a", "x86_64", "x86")
+                isUniversalApk = true
+            }
         }
     }
 

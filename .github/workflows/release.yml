@@ -1,0 +1,116 @@
+name: Release APKs
+
+# Builds every distributable APK variant and attaches them to a GitHub Release.
+# Trigger: push a tag like v3.0.3-fork.1, or run manually with a tag name.
+#
+# Signing comes from repository secrets (Settings → Secrets → Actions):
+#   LITUBE_KEYSTORE_BASE64   base64 of the .jks
+#   LITUBE_KEYSTORE_PASSWORD
+#   LITUBE_KEY_ALIAS         (defaults to "litube" when empty)
+#   LITUBE_KEY_PASSWORD      (defaults to the keystore password when empty)
+# Without the keystore secret the release APKs are left unsigned and the job
+# still publishes the debug-signed variants.
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Release tag to create/update (e.g. v3.0.3-fork.1)
+        required: true
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  apks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      TAG: ${{ github.event.inputs.tag || github.ref_name }}
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: 'platform-tools platforms;android-36 build-tools;36.0.0'
+          log-accepted-android-sdk-licenses: false
+      - uses: gradle/actions/setup-gradle@v6
+
+      - name: Restore release keystore
+        if: ${{ secrets.LITUBE_KEYSTORE_BASE64 != '' }}
+        env:
+          KEYSTORE_BASE64: ${{ secrets.LITUBE_KEYSTORE_BASE64 }}
+        run: |
+          echo "$KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/release.jks"
+          echo "LITUBE_KEYSTORE=$RUNNER_TEMP/release.jks" >> "$GITHUB_ENV"
+
+      - name: Build release (per-ABI + universal), minifiedDebug and debug
+        env:
+          LITUBE_KEYSTORE_PASSWORD: ${{ secrets.LITUBE_KEYSTORE_PASSWORD }}
+          LITUBE_KEY_ALIAS: ${{ secrets.LITUBE_KEY_ALIAS }}
+          LITUBE_KEY_PASSWORD: ${{ secrets.LITUBE_KEY_PASSWORD }}
+        run: >-
+          bash gradlew :app:assembleRelease :app:assembleMinifiedDebug :app:assembleDebug -PabiSplits=true
+          --max-workers=2 -Pkotlin.compiler.execution.strategy=in-process
+          "-Dorg.gradle.jvmargs=-Xmx3g -Dfile.encoding=UTF-8" --stacktrace
+
+      - name: Collect and name artifacts
+        run: |
+          set -euo pipefail
+          version=$(sed -n 's/.*versionName = "\([^"]*\)".*/\1/p' app/build.gradle.kts | head -1)
+          out=dist; mkdir -p "$out"
+          for f in app/build/outputs/apk/release/*.apk; do
+            base=$(basename "$f" .apk)                     # app-arm64-v8a-release[-unsigned] | app-universal-release
+            abi=${base#app-}; abi=${abi%-release}; abi=${abi%-release-unsigned}
+            signed=release; [[ "$base" == *-unsigned ]] && signed=release-unsigned
+            cp "$f" "$out/litube-${version}-${abi}-${signed}.apk"
+          done
+          for f in app/build/outputs/apk/minifiedDebug/*.apk; do
+            base=$(basename "$f" .apk); abi=${base#app-}; abi=${abi%-minifiedDebug}
+            cp "$f" "$out/litube-${version}-${abi}-minified-debugsigned.apk"
+          done
+          for f in app/build/outputs/apk/debug/*.apk; do
+            base=$(basename "$f" .apk); abi=${base#app-}; abi=${abi%-debug}
+            cp "$f" "$out/litube-${version}-${abi}-debug.apk"
+          done
+          [ -d app/build/outputs/mapping/release ] && (cd app/build/outputs/mapping/release && zip -qr "$GITHUB_WORKSPACE/$out/mapping-release-${version}.zip" .)
+          (cd "$out" && sha256sum *.apk > SHA256SUMS.txt)
+          ls -la "$out"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: litube-apks
+          path: dist
+          if-no-files-found: error
+
+      - name: Publish GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          notes="Built from $(git rev-parse --short HEAD) by GitHub Actions.
+
+          | file | what |
+          |---|---|
+          | \`*-universal-release.apk\` | all ABIs in one APK, R8-minified, release-signed — pick this if unsure |
+          | \`*-arm64-v8a-release.apk\` | 64-bit ARM (most phones since ~2017), smallest download |
+          | \`*-armeabi-v7a-release.apk\` | 32-bit ARM (older/budget phones) |
+          | \`*-x86_64-release.apk\` / \`*-x86-release.apk\` | emulators, Chromebooks |
+          | \`*-minified-debugsigned.apk\` | same R8 build, debug-signed, package \`com.hhst.litube.minified\` (installs side by side) |
+          | \`*-debug.apk\` | unminified, debuggable, package \`com.hhst.litube.debug\` |
+
+          \`SHA256SUMS.txt\` lists every file. Release-signed APKs upgrade in place only over APKs signed with the same key (this fork's key, not upstream's)."
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" dist/* --clobber
+          else
+            gh release create "$TAG" dist/* --title "Litube $TAG" --notes "$notes" --prerelease
+          fi
