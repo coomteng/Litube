@@ -78,6 +78,7 @@ import com.hhst.youtubelite.browser.WebViewFactory
 import com.hhst.youtubelite.browser.TransientUi
 import com.hhst.youtubelite.browser.TransientKind
 import androidx.compose.ui.graphics.graphicsLayer
+import com.hhst.youtubelite.core.Constants
 import com.hhst.youtubelite.core.HapticsController
 import com.hhst.youtubelite.downloader.core.BatchSnapshot
 import com.hhst.youtubelite.downloader.core.SnapshotReject
@@ -230,10 +231,15 @@ fun BrowserScreen(
 
     // Host create/destroy in effects so composition stays free of WebView side effects.
     // The suspended watch tab keeps its host.
-    val liveTabIds = remember(tabs, uiState.suspendedWatchId) {
+    // Spare host for the bottom-nav Shorts tab, built while the user is still on
+    // the feed so the tap lands on an already-hydrated shell. Cleared once the
+    // tab materialises.
+    var prewarmId by remember { mutableStateOf<Long?>(null) }
+    val liveTabIds = remember(tabs, uiState.suspendedWatchId, prewarmId) {
         buildSet {
             tabs.forEach { add(it.id) }
             uiState.suspendedWatchId?.let { add(it) }
+            prewarmId?.let { add(it) }
         }
     }
     val queueAdded = stringResource(R.string.queue_item_added)
@@ -307,9 +313,39 @@ fun BrowserScreen(
         }
     }
 
+    DisposableEffect(viewModel) {
+        viewModel.hasHost = { hosts.containsKey(it) }
+        onDispose { viewModel.hasHost = { false } }
+    }
+    LaunchedEffect(tabs, uiState.isLoading, prewarmId, hosts[prewarmId]) {
+        if (tabs.any { it.id == prewarmId }) { prewarmId = null; return@LaunchedEffect }
+        if (tabs.any { it.kind == Constants.PAGE_SHORTS }) return@LaunchedEffect
+        if (prewarmId != null && hosts[prewarmId] != null) return@LaunchedEffect
+        if (uiState.isLoading || PageKind.isShorts(uiState.url)) return@LaunchedEffect
+        if (extensionManager.isEnabled(PreferenceKeys.ENABLE_HIDE_SHORTS)) return@LaunchedEffect
+        delay(SHORTS_PREWARM_DELAY_MS)
+        val id = viewModel.reserveShortsTabId()
+        if (id !in hosts) {
+            hosts[id] = createHost(
+                id, SHORTS_PREWARM_URL, context, viewModel, extensionManager, onOpenExtension,
+                onOpenDownloads, onOpenWith, onAbout, extractor, playerViewModel, onAddToQueue,
+                onShowMediaItemMenu, onPlaylistPresence, onMicrophoneRequest,
+            ).also {
+                // Not paused: the shell must finish hydrating (reel sequence,
+                // first item) while hidden. shorts.js keeps playback stopped on
+                // an inactive tab, so no audio leaks.
+                it.webView.evaluateJavascript("window.dispatchEvent(new CustomEvent('tabVisibilityChanged',{detail:{active:false}}));", null)
+            }
+        }
+        prewarmId = id
+    }
+
     LaunchedEffect(viewModel) {
         viewModel.loadRequests.collect { (tabId, url) ->
             hosts[tabId]?.webView?.let { webView ->
+                // Bare /shorts (bottom-nav pivot) into a host already showing the
+                // Shorts shell (pre-warmed): the hydrated document is the target.
+                if (PageKind.isShorts(url) && VideoId.parse(url) == null && PageKind.isShorts(webView.url)) return@let
                 WebViewFactory.prepareBackground(webView, url)
                 webView.loadUrl(url)
             }
@@ -878,34 +914,57 @@ private fun createHosts(
     onMicrophoneRequest: ((onResult: (Boolean) -> Unit) -> Unit)? = null,
 ) {
     for (tab in tabs) {
+        // A pre-warmed Shorts host (see the prewarm effect in BrowserScreen) is
+        // reused as-is; its load arrives through BrowserViewModel.loadRequests.
         if (tab.id in hosts) continue
-        val tabId = tab.id
-        hosts[tabId] = WebViewFactory.create(
-            context = context,
-            callbacks = viewModel.callbacksFor(tabId),
-            extensionManager = extensionManager,
-            onOpenExtension = onOpenExtension,
-            onOpenDownloads = onOpenDownloads,
-            onOpenWith = onOpenWith,
-            onAbout = onAbout,
-            onRefresh = { webView ->
-                viewModel.onRefreshStarted(tabId)
-                webView.reload()
-            },
-            extractor = extractor,
-            playerHooks = playerHooks,
-            tabId = tabId,
-            onAddToQueue = onAddToQueue,
-            onShowMediaItemMenu = onShowMediaItemMenu,
-            onPlaylistPresence = onPlaylistPresence?.let { callback ->
-                { has: Boolean -> callback(tabId, has) }
-            },
-            onMicrophoneRequest = onMicrophoneRequest,
-        ).also {
-            WebViewFactory.prepareBackground(it.webView, tab.url)
-            it.webView.loadUrl(tab.url)
-        }
+        hosts[tab.id] = createHost(
+            tab.id, tab.url, context, viewModel, extensionManager, onOpenExtension, onOpenDownloads,
+            onOpenWith, onAbout, extractor, playerHooks, onAddToQueue, onShowMediaItemMenu,
+            onPlaylistPresence, onMicrophoneRequest,
+        )
     }
+}
+
+private fun createHost(
+    tabId: Long,
+    url: String,
+    context: Context,
+    viewModel: BrowserViewModel,
+    extensionManager: ExtensionManager,
+    onOpenExtension: () -> Unit,
+    onOpenDownloads: () -> Unit,
+    onOpenWith: (String) -> Unit,
+    onAbout: () -> Unit,
+    extractor: Extractor,
+    playerHooks: PlayerHooks,
+    onAddToQueue: ((Bridge.QueueItemJson?) -> Unit)?,
+    onShowMediaItemMenu: ((Bridge.QueueItemJson) -> Unit)?,
+    onPlaylistPresence: ((Long, Boolean) -> Unit)?,
+    onMicrophoneRequest: ((onResult: (Boolean) -> Unit) -> Unit)?,
+): BrowserHost = WebViewFactory.create(
+    context = context,
+    callbacks = viewModel.callbacksFor(tabId),
+    extensionManager = extensionManager,
+    onOpenExtension = onOpenExtension,
+    onOpenDownloads = onOpenDownloads,
+    onOpenWith = onOpenWith,
+    onAbout = onAbout,
+    onRefresh = { webView ->
+        viewModel.onRefreshStarted(tabId)
+        webView.reload()
+    },
+    extractor = extractor,
+    playerHooks = playerHooks,
+    tabId = tabId,
+    onAddToQueue = onAddToQueue,
+    onShowMediaItemMenu = onShowMediaItemMenu,
+    onPlaylistPresence = onPlaylistPresence?.let { callback ->
+        { has: Boolean -> callback(tabId, has) }
+    },
+    onMicrophoneRequest = onMicrophoneRequest,
+).also {
+    WebViewFactory.prepareBackground(it.webView, url)
+    it.webView.loadUrl(url)
 }
 
 private fun destroyHost(host: BrowserHost) {
@@ -931,6 +990,15 @@ private fun Context.findActivity(): Activity? {
     return null
 }
 
+/** Idle gap after the active page settles before the spare Shorts host is built. */
+private const val SHORTS_PREWARM_DELAY_MS = 1500L
+/**
+ * The Shorts shell, i.e. what the bottom-nav pivot opens. Hydrating it (reel
+ * sequence, first item, player) is the slow part of entering Shorts, so it is
+ * done ahead of time off-screen; shorts.js keeps its player stopped while the
+ * tab is inactive (tabVisibilityChanged), so nothing plays until the tab shows.
+ */
+private const val SHORTS_PREWARM_URL = "https://m.youtube.com/shorts"
 private const val TAB_FADE_MS = 180
 private const val TAB_SLIDE_MS = 220
 private val TAB_DESTROY_DELAY_MS = maxOf(TAB_FADE_MS, TAB_SLIDE_MS) + 40L

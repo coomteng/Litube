@@ -5,6 +5,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class TabControllerTest {
@@ -208,5 +209,47 @@ class TabControllerTest {
         val (state, _) = tabs.openTab("https://m.youtube.com/watch?v=c")
         assertEquals(1, state.tabs.count { it.kind == Constants.PAGE_WATCH })
         assertNull(state.suspendedWatchId)
+    }
+}
+
+class TabControllerReservedShortsTest {
+    @Test
+    fun reservedId_isUsedByTheNextNewShortsTab() {
+        val tabs = TabController()
+        val reserved = tabs.reserveShortsTabId()
+        tabs.openTab("https://m.youtube.com/@A")
+        val (state, load) = tabs.openTab("https://m.youtube.com/shorts/")
+        assertEquals(reserved, state.activeId)
+        assertEquals(reserved to "https://m.youtube.com/shorts/", load)
+        assertEquals(Constants.PAGE_SHORTS, state.active?.kind)
+    }
+
+    @Test
+    fun reservedId_isConsumedOnce_andNeverCollidesWithOtherTabs() {
+        val tabs = TabController()
+        val reserved = tabs.reserveShortsTabId()
+        val other = tabs.openTab("https://m.youtube.com/@A").first.activeId
+        assertTrue(other != reserved)
+        tabs.openTab("https://m.youtube.com/shorts/")
+        tabs.pop()
+        val second = tabs.openTab("https://m.youtube.com/shorts/").first.activeId
+        assertTrue(second != reserved)
+    }
+
+    @Test
+    fun reservedId_isNotUsedForAShortsOpenedById() {
+        val tabs = TabController()
+        val reserved = tabs.reserveShortsTabId()
+        val (state, _) = tabs.openTab("https://m.youtube.com/shorts/aaaaaaaaaaa")
+        assertTrue(state.activeId != reserved)
+        tabs.pop()
+        // Still reserved for the next bare /shorts.
+        assertEquals(reserved, tabs.openTab("https://m.youtube.com/shorts/").first.activeId)
+    }
+
+    @Test
+    fun reserve_isIdempotentUntilConsumed() {
+        val tabs = TabController()
+        assertEquals(tabs.reserveShortsTabId(), tabs.reserveShortsTabId())
     }
 }

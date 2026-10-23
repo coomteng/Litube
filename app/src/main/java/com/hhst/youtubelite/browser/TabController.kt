@@ -1,6 +1,7 @@
 package com.hhst.youtubelite.browser
 
 import com.hhst.youtubelite.core.Constants
+import com.hhst.youtubelite.extractor.VideoId
 
 data class Tab(
     val id: Long,
@@ -37,6 +38,8 @@ class TabController(
     private var activeId: Long
     private var suspendedWatch: Tab? = null
     private var inheritedShortsId: Long? = null
+    /** Tab id handed out ahead of time so a host can be pre-created for the next Shorts tab. */
+    private var reservedShortsId: Long? = null
 
     init {
         val home = Tab(id = nextId++, kind = Constants.PAGE_HOME, url = homeUrl)
@@ -48,6 +51,14 @@ class TabController(
         TabState(tabs = tabs.toList(), activeId = activeId, suspendedWatchId = suspendedWatch?.id)
 
     fun canPop(): Boolean = tabs.size > 1
+
+    /**
+     * Reserves the id the next *new* bare-`/shorts` tab (bottom-nav pivot) will
+     * get, so the screen can build and warm its WebView before the user taps.
+     * Idempotent until consumed. Shorts opened by id keep a fresh tab: a cold
+     * document beats re-navigating the warmed shell for a specific video.
+     */
+    fun reserveShortsTabId(): Long = reservedShortsId ?: (nextId++).also { reservedShortsId = it }
 
     /**
      * Routes [url] into an existing or new tab.
@@ -214,7 +225,10 @@ class TabController(
     }
 
     private fun create(kind: String, url: String): Pair<TabState, Pair<Long, String>?> {
-        val created = Tab(id = nextId++, kind = kind, url = url)
+        val id = if (kind == Constants.PAGE_SHORTS && reservedShortsId != null && VideoId.parse(url) == null) {
+            reservedShortsId!!.also { reservedShortsId = null }
+        } else nextId++
+        val created = Tab(id = id, kind = kind, url = url)
         tabs += created
         activeId = created.id
         return state() to (created.id to url)

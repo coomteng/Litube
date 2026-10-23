@@ -32,6 +32,9 @@ class BrowserViewModel(
     /** Player surface is showing; wired by the screen. */
     var isPlayerShowing: () -> Boolean = { false }
 
+    /** A WebView host already exists for this tab id (pre-warmed); wired by the screen. */
+    var hasHost: (Long) -> Boolean = { false }
+
     /** Watch tab got suspended; the player should enter the mini-player. */
     var onWatchSuspended: (() -> Unit)? = null
 
@@ -61,6 +64,13 @@ class BrowserViewModel(
             canGoBackByTab[_uiState.value.activeId] = value
             _uiState.update { it.copy(canGoBack = value) }
         }
+
+    /**
+     * Id of the next new Shorts tab. The screen pre-creates a warm WebView host
+     * under this id while the user is still on the home feed, so entering
+     * Shorts does not pay WebView construction + cold document start.
+     */
+    fun reserveShortsTabId(): Long = tabs.reserveShortsTabId()
 
     fun openTab(url: String) {
         if (!UrlPolicy.isAllowedUrl(url)) return
@@ -109,7 +119,7 @@ class BrowserViewModel(
         publish(state, resetLoading = switched, forward = if (switched) true else null)
         // New tabs load on host create; existing tabs (incl. just-revived
         // suspended ones) need an explicit load.
-        if (load != null && load.first in existingIds) {
+        if (load != null && (load.first in existingIds || hasHost(load.first))) {
             _loadRequests.tryEmit(load)
         }
     }
