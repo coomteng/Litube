@@ -3,6 +3,7 @@
 package com.hhst.youtubelite.player
 
 import android.content.Context
+import android.content.Intent
 import android.os.Handler
 import android.os.Looper
 import android.os.SystemClock
@@ -40,6 +41,7 @@ import com.hhst.youtubelite.player.sponsor.SponsorBlockManager
 import com.hhst.youtubelite.player.surface.AutoFullscreen
 import com.hhst.youtubelite.player.surface.GestureMath.GestureZone
 import com.hhst.youtubelite.player.surface.PlayerPlaybackActions
+import com.hhst.youtubelite.player.surface.WvcHandoff
 import com.hhst.youtubelite.player.surface.PlayerUi
 import com.hhst.youtubelite.player.surface.ResizeMode
 import com.hhst.youtubelite.player.surface.SubtitleStyle
@@ -132,6 +134,10 @@ data class PlayerUiState(
     val castLinkConnected: Boolean = false,
     val castAvailable: Boolean = false,
     val castDevices: List<CastDevice> = emptyList(),
+    /** Web Video Caster is installed: the cast dialog offers a hand-off row. */
+    val castWvcAvailable: Boolean = false,
+    /** A YouTube TV-code pairing is in flight. */
+    val castPairing: Boolean = false,
     /** User-adjustable subtitle appearance (persists across videos). */
     val subtitleStyle: SubtitleStyle = SubtitleStyle(),
 )
@@ -162,7 +168,7 @@ class PlayerViewModel(
     private val cast: CastController,
     private val appContext: Context? = null,
     private val haptics: HapticsController? = null,
-) : ViewModel(), PlayerHooks, PlayerPlaybackActions {
+) : ViewModel(), PlayerHooks, PlayerPlaybackActions, WvcHandoff {
 
     private val _uiState = MutableStateFlow(PlayerUiState())
     val uiState: StateFlow<PlayerUiState> = _uiState.asStateFlow()
@@ -328,12 +334,14 @@ class PlayerViewModel(
             cast.state.collect { c ->
                 _uiState.update {
                     it.copy(
-                        casting = c.chromecastSession,
+                        casting = c.remoteSession,
                         castingDeviceName = c.deviceName,
                         castLinkUrl = c.linkUrl,
                         castLinkConnected = c.linkConnected,
                         castAvailable = c.available,
                         castDevices = c.devices,
+                        castWvcAvailable = c.wvcAvailable,
+                        castPairing = c.pairing,
                     )
                 }
             }
@@ -654,7 +662,7 @@ class PlayerViewModel(
         // re-opened its watch page mid-cast): engine.play short-circuited and
         // resumed the receiver — re-handing off would reload it at 0.
         if (
-            cast.state.value.chromecastSession &&
+            cast.state.value.remoteSession &&
             id != null &&
             engine.currentCastSource()?.videoId != id
         ) {
@@ -670,7 +678,7 @@ class PlayerViewModel(
                     onHint(hintCastFailed)
                 }
                 val source = engine.prepareCastSource()
-                if (token != playbackRequestSeq || !cast.state.value.chromecastSession) return@launch
+                if (token != playbackRequestSeq || !cast.state.value.remoteSession) return@launch
                 if (source == null) {
                     handoffFailed()
                     return@launch
@@ -1027,9 +1035,9 @@ class PlayerViewModel(
         // Guard against a stop tap after the session already ended: the
         // detached castPlayer keeps its last position, and seeking the local
         // player there would jump the video backward (or to 0) unprompted.
-        // chromecastSession==false means the session-ended teardown already
+        // remoteSession==false means the session-ended teardown already
         // ran, so there is nothing to stop.
-        if (!cast.state.value.chromecastSession) return
+        if (!cast.state.value.remoteSession) return
         userCastStop = true
         detachCastAndResumeLocal(cast.stopCasting(), resume = true)
         cast.endSession()
@@ -1055,6 +1063,30 @@ class PlayerViewModel(
     }
 
     override fun onCloseCastLink() = cast.stopLink()
+
+    /** `Link with TV code`: pair a YouTube TV the LAN scan did not find. */
+    override fun onCastPairCode(code: String) {
+        if (code.filter(Char::isDigit).length < 6) { onHint(hintCastFailed); return }
+        cast.pairYoutubeTv(code)
+    }
+
+    /**
+     * Hand the current video to Web Video Caster. Publishes the source on
+     * the LAN proxy and returns the VIEW intent for the host to start; null
+     * (plus a hint) when nothing can be handed off.
+     */
+    override fun wvcHandoffIntent(onIntent: (Intent) -> Unit) {
+        val token = playbackRequestSeq
+        viewModelScope.launch {
+            val source = engine.prepareCastSource()
+            if (token != playbackRequestSeq) return@launch
+            val intent = source?.let { cast.wvcIntent(it) }
+            if (intent == null) { onHint(hintCastFailed); return@launch }
+            // The TV takes over; keep the local player quiet.
+            engine.pause()
+            onIntent(intent)
+        }
+    }
 
     override fun onSponsorSkipCancel() {
         engine.cancelSponsorSkip()
@@ -1135,7 +1167,7 @@ class PlayerViewModel(
         val token = playbackRequestSeq
         viewModelScope.launch {
             val source = engine.prepareCastSource()
-            if (token != playbackRequestSeq || !cast.state.value.chromecastSession) return@launch
+            if (token != playbackRequestSeq || !cast.state.value.remoteSession) return@launch
             if (source == null) { teardownCast(); return@launch }
             engine.pause()
             if (cast.startCasting(source, _positionState.longValue)) {
@@ -1153,7 +1185,7 @@ class PlayerViewModel(
      * tracks from [PlaybackApi.currentCastSource].
      */
     private fun recastPublishedSource() {
-        if (!cast.state.value.chromecastSession) return
+        if (!cast.state.value.remoteSession) return
         val source = engine.currentCastSource() ?: return
         if (!cast.startCasting(source, engine.snapshot.value.positionMs)) {
             teardownCast()
@@ -1241,7 +1273,7 @@ class PlayerViewModel(
 
     /** Closing the system PiP window explicitly ends local playback. */
     fun onPipDismissed() {
-        val remote = cast.state.value.chromecastSession || cast.state.value.linkConnected
+        val remote = cast.state.value.remoteSession || cast.state.value.linkConnected
         stopAndHide(pausePlayback = !remote)
         if (remote) engine.pauseLocal() else engine.stop()
         onWatchClosed?.invoke()
@@ -1280,7 +1312,7 @@ class PlayerViewModel(
             return
         }
         userCastStop = true
-        if (cast.state.value.chromecastSession) {
+        if (cast.state.value.remoteSession) {
             cast.stopCasting()
             cast.endSession()
         } else {

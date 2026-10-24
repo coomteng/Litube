@@ -247,6 +247,11 @@ data class CastSource(
     val author: String? = null,
     /** Receiver OSD artwork (public i.ytimg.com URL, fetchable by the TV). */
     val thumbnailUrl: String? = null,
+    /**
+     * Best muxed H.264+AAC MP4 (itag 22/18) for progressive-only targets such
+     * as DLNA renderers that cannot play DASH; null when YouTube offers none.
+     */
+    val progressive: Format? = null,
 )
 
 @UnstableApi
@@ -1323,7 +1328,8 @@ class PlaybackEngine(
             ?: pool.firstOrNull { it.height <= CAST_MAX_HEIGHT }
             ?: pool.firstOrNull()
         val audio = castAudio(video)
-        if (video == null || audio == null) return null
+        val progressive = progressiveCandidate()
+        if ((video == null || audio == null) && progressive == null) return null
         return CastSource(
             videoId = id,
             title = meta.title.ifBlank { _snapshot.value.title },
@@ -1334,8 +1340,15 @@ class PlaybackEngine(
             // Public CDN URL. The receiver fetches artwork directly; the LAN
             // proxy is not required, and CORS does not apply.
             thumbnailUrl = VideoId.thumbnailUrl(id),
+            progressive = progressive,
         )
     }
+
+    /** Highest muxed MP4 (H.264) with a URL; DLNA renderers need one file. */
+    private fun progressiveCandidate(): Format? =
+        currentStream?.formats.orEmpty()
+            .filter { StreamSelection.isMuxed(it) && it.url.isNotBlank() && it.mimeType.contains("mp4", true) }
+            .maxByOrNull { it.height }
 
     override suspend fun prepareCastSource(): CastSource? {
         currentCastSource()?.let { return it }

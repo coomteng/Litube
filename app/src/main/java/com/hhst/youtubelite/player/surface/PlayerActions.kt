@@ -46,6 +46,10 @@ interface PlayerPlaybackActions {
     fun onCastDevice(id: String)
     fun onShareCastLink()
     fun onCloseCastLink()
+    /** YouTube TV `Link with TV code` pairing. */
+    fun onCastPairCode(code: String) {}
+    /** Hand the current video to the Web Video Caster app (host starts the intent). */
+    fun onCastToWvc() {}
     fun onMiniClose()
     fun onMiniRestore()
     /** User cancelled the sponsor pre-skip countdown. */
@@ -73,6 +77,8 @@ interface PlayerWindowActions {
     fun onShare()
     /** Fires the system share sheet with the cast link (proxy already ensured by [PlayerPlaybackActions.onShareCastLink]). */
     fun shareCastLink()
+    /** Starts an external app intent (Web Video Caster hand-off). */
+    fun startExternal(intent: android.content.Intent) {}
     /** Finger up: reset per-gesture accumulators. */
     fun onGestureEnd() {}
 }
@@ -100,4 +106,15 @@ class PlayerCallbackBridge(
         playback.onShareCastLink()
         window.shareCastLink()
     }
+
+    override fun onCastToWvc() {
+        // The playback side publishes the stream and builds the intent; the
+        // window side owns the Activity that can start it.
+        (playback as? WvcHandoff)?.wvcHandoffIntent { window.startExternal(it) } ?: playback.onCastToWvc()
+    }
+}
+
+/** Playback actions that can build a Web Video Caster hand-off intent. */
+interface WvcHandoff {
+    fun wvcHandoffIntent(onIntent: (android.content.Intent) -> Unit)
 }

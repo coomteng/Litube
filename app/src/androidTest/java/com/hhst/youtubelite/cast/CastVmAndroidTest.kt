@@ -87,7 +87,7 @@ class CastVmAndroidTest {
             await(10000) { controller.remotePlayer()?.isPlaying == true }
             Thread.sleep(1500) // Allow the independent receiver to sample actual decoded frames/audio.
             compose.runOnUiThread { controller.endSession() }
-            assertFalse(controller.state.value.chromecastSession)
+            assertFalse(controller.state.value.remoteSession)
         } finally {
             compose.runOnUiThread { controller.endSession(); controller.setDiscoveryEnabled(false) }
             upstream.stop()

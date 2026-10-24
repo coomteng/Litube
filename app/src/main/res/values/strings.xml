@@ -141,6 +141,17 @@
     <string name="cast_section_link">Open on any device</string>
     <string name="cast_section_link_hint">On the same Wi-Fi network.</string>
     <string name="cast_learn_casting">Learn about casting</string>
+    <string name="cast_kind_chromecast">Chromecast</string>
+    <string name="cast_kind_dlna">DLNA (TV / speaker)</string>
+    <string name="cast_kind_youtube_tv">YouTube on TV</string>
+    <string name="cast_section_other_apps">Other apps</string>
+    <string name="cast_wvc_row">Cast with Web Video Caster</string>
+    <string name="cast_wvc_hint">Opens the stream in Web Video Caster; pick the TV there.</string>
+    <string name="cast_tv_code_title">Link with TV code</string>
+    <string name="cast_tv_code_hint">YouTube on TV → Settings → Link with TV code</string>
+    <string name="cast_tv_code_field">TV code</string>
+    <string name="cast_tv_code_connect">Connect</string>
+    <string name="cast_pairing">Pairing…</string>
     <string name="add_to_queue">Add to queue</string>
     <string name="thumbnail">Thumbnail</string>
     <string name="cast_link_connected">Link opened in browser</string>

@@ -11,6 +11,8 @@
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <!-- LAN Cast discovery and the local media proxy. -->
     <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
+    <!-- SSDP multicast (DLNA renderers, DIAL screens): Wi-Fi drops multicast without the lock. -->
+    <uses-permission android:name="android.permission.CHANGE_WIFI_MULTICAST_STATE" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
@@ -27,6 +29,11 @@
     <uses-permission
         android:name="android.permission.READ_EXTERNAL_STORAGE"
         android:maxSdkVersion="32" />
+
+    <!-- Package visibility (API 30+): the cast dialog offers a hand-off to Web Video Caster when installed. -->
+    <queries>
+        <package android:name="com.instantbits.cast.webvideo" />
+    </queries>
 
     <application
         android:name=".App"

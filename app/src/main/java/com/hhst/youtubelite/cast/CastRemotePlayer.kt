@@ -79,6 +79,9 @@ internal class CastRemotePlayer(private val session: CastV2Session) : SimpleBase
 
     fun fail(reason: String) {
         playing = false
+        wanted = false
+        // SimpleBasePlayer only accepts a player error in STATE_IDLE.
+        state = STATE_IDLE
         error = PlaybackException(reason, null, PlaybackException.ERROR_CODE_REMOTE_ERROR)
         invalidateState()
     }

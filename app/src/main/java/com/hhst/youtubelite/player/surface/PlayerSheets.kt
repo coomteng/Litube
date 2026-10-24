@@ -230,6 +230,8 @@ fun PlayerDialogHost(
             onRefresh = onRefreshCastState,
             onDiscovery = callbacks::onCastDiscovery,
             onDismiss = onDismiss,
+            onPairCode = callbacks::onCastPairCode,
+            onWvc = callbacks::onCastToWvc,
         )
         PlayerDialog.SubtitleStyle -> SubtitleStyleDialog(
             style = state.subtitleStyle,

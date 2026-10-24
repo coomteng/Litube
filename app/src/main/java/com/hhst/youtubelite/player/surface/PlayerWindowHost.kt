@@ -105,6 +105,11 @@ class PlayerWindowHost(
         shareText(act, url, act.getString(R.string.cast))
     }
 
+    override fun startExternal(intent: Intent) {
+        val act = activity ?: return
+        runCatching { act.startActivity(intent) }
+    }
+
     override fun onGestureEnd() {
         volumeLevel = null
         lastVolumeSet = null
