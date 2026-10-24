@@ -41,8 +41,8 @@ Report issues with the app version, device model, Android version and steps to r
 
 LitubeX is upstream Litube plus performance work (Shorts pre-warm, faster HLS start-up),
 shipped as a **separate app** (`com.coomteng.litube`) so it installs alongside Litube.
-Versions are `<upstream>.<fork revision>`, e.g. 3.0.3.1. Pre-built APKs for every variant
-are attached to each [release](https://github.com/coomteng/Litube/releases):
+Versions are `<upstream>.<fork revision>`, e.g. 3.0.3.1. Pre-built release APKs for every
+ABI are attached to each [release](https://github.com/coomteng/Litube/releases):
 
 | file | what |
 |---|---|
@@ -50,8 +50,6 @@ are attached to each [release](https://github.com/coomteng/Litube/releases):
 | `litubex-<ver>-arm64-v8a-release.apk` | 64-bit ARM (most phones since ~2017), smallest |
 | `litubex-<ver>-armeabi-v7a-release.apk` | 32-bit ARM |
 | `litubex-<ver>-x86_64-release.apk`, `-x86-` | emulators / Chromebooks |
-| `litubex-<ver>-*-minified-debugsigned.apk` | same R8 build, debug key, package `com.coomteng.litube.minified` |
-| `litubex-<ver>-*-debug.apk` | unminified, debuggable, package `com.coomteng.litube.debug` |
 
 They are built by `.github/workflows/release.yml` on every `v*` tag and signed with this
 fork's own key.

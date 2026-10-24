@@ -8,8 +8,8 @@ name: Release APKs
 #   LITUBE_KEYSTORE_PASSWORD
 #   LITUBE_KEY_ALIAS         (defaults to "litube" when empty)
 #   LITUBE_KEY_PASSWORD      (defaults to the keystore password when empty)
-# Without the keystore secret the release APKs are left unsigned and the job
-# still publishes the debug-signed variants.
+# Without the keystore secret the release APKs are published unsigned
+# (named *-release-unsigned.apk).
 
 on:
   push:
@@ -53,13 +53,13 @@ jobs:
           echo "$KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/release.jks"
           echo "LITUBE_KEYSTORE=$RUNNER_TEMP/release.jks" >> "$GITHUB_ENV"
 
-      - name: Build release (per-ABI + universal), minifiedDebug and debug
+      - name: Build release (per-ABI + universal)
         env:
           LITUBE_KEYSTORE_PASSWORD: ${{ secrets.LITUBE_KEYSTORE_PASSWORD }}
           LITUBE_KEY_ALIAS: ${{ secrets.LITUBE_KEY_ALIAS }}
           LITUBE_KEY_PASSWORD: ${{ secrets.LITUBE_KEY_PASSWORD }}
         run: >-
-          bash gradlew :app:assembleRelease :app:assembleMinifiedDebug :app:assembleDebug -PabiSplits=true
+          bash gradlew :app:assembleRelease -PabiSplits=true
           --max-workers=2 -Pkotlin.compiler.execution.strategy=in-process
           "-Dorg.gradle.jvmargs=-Xmx3g -Dfile.encoding=UTF-8" --stacktrace
 
@@ -73,14 +73,6 @@ jobs:
             abi=${base#app-}; abi=${abi%-release}; abi=${abi%-release-unsigned}
             signed=release; [[ "$base" == *-unsigned ]] && signed=release-unsigned
             cp "$f" "$out/litubex-${version}-${abi}-${signed}.apk"
-          done
-          for f in app/build/outputs/apk/minifiedDebug/*.apk; do
-            base=$(basename "$f" .apk); abi=${base#app-}; abi=${abi%-minifiedDebug}
-            cp "$f" "$out/litubex-${version}-${abi}-minified-debugsigned.apk"
-          done
-          for f in app/build/outputs/apk/debug/*.apk; do
-            base=$(basename "$f" .apk); abi=${base#app-}; abi=${abi%-debug}
-            cp "$f" "$out/litubex-${version}-${abi}-debug.apk"
           done
           [ -d app/build/outputs/mapping/release ] && (cd app/build/outputs/mapping/release && zip -qr "$GITHUB_WORKSPACE/$out/mapping-release-${version}.zip" .)
           (cd "$out" && sha256sum *.apk > SHA256SUMS.txt)
@@ -105,8 +97,6 @@ jobs:
           | \`*-arm64-v8a-release.apk\` | 64-bit ARM (most phones since ~2017), smallest download |
           | \`*-armeabi-v7a-release.apk\` | 32-bit ARM (older/budget phones) |
           | \`*-x86_64-release.apk\` / \`*-x86-release.apk\` | emulators, Chromebooks |
-          | \`*-minified-debugsigned.apk\` | same R8 build, debug-signed, package \`com.coomteng.litube.minified\` (installs side by side) |
-          | \`*-debug.apk\` | unminified, debuggable, package \`com.coomteng.litube.debug\` |
 
           \`SHA256SUMS.txt\` lists every file. LitubeX is a separate app (package \`com.coomteng.litube\`): it installs next to upstream Litube and does not replace it."
           if gh release view "$TAG" >/dev/null 2>&1; then
