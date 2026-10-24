@@ -121,6 +121,8 @@ class CastController(
     private interface RemoteSession {
         val kind: CastDeviceKind
         val player: Player
+        /** Tallest video rendition this target plays; the engine picks under it. */
+        val maxVideoHeight: Int get() = Int.MAX_VALUE
         /** Pushes [source] at [positionMs]; false when it cannot be cast there. */
         fun load(source: CastSource, positionMs: Long): Boolean
         /** Stops the current media; the session stays up. Returns the position. */
@@ -138,6 +140,8 @@ class CastController(
         return true
     }
     fun remotePlayer(): Player? = if (castingActive) currentSession?.player else null
+    /** Video height cap for the connected target (Int.MAX_VALUE when none). */
+    fun maxVideoHeight(): Int = currentSession?.maxVideoHeight ?: Int.MAX_VALUE
     fun setDiscoveryEnabled(enabled: Boolean) { discoveryUserEnabled = enabled; applyDiscovery() }
 
     private fun applyDiscovery() {
@@ -296,6 +300,12 @@ class CastController(
 
     private inner class ChromecastSession(val session: CastV2Session) : RemoteSession {
         override val kind = CastDeviceKind.CHROMECAST
+        // The Default Media Receiver (CC1AD845) rejects 1080p H.264 DASH with
+        // LOAD_FAILED (verified on Pixel Tablet with ffmpeg-packaged DASH of
+        // the same bytes, any profile/level, even re-encoded), while the same
+        // 1080p file plays fine progressively and 720p DASH plays. Cap DASH
+        // casting at 720p.
+        override val maxVideoHeight = CHROMECAST_DASH_MAX_HEIGHT
         val castPlayer = CastRemotePlayer(session)
         override val player: Player get() = castPlayer
         override fun load(source: CastSource, positionMs: Long): Boolean {
@@ -783,6 +793,7 @@ class CastController(
     companion object {
         private const val TAG = "CastController"
         const val WVC_PACKAGE = "com.instantbits.cast.webvideo"
+        private const val CHROMECAST_DASH_MAX_HEIGHT = 720
         /** DLNA failures that justify trying the next media plan (video → audio). */
         private val FALLBACK_REASONS = setOf("load", "no_start", "stalled")
         private const val SIDX_FETCH_TIMEOUT_MS = 15_000L

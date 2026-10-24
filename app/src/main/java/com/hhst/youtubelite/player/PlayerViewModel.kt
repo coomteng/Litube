@@ -677,7 +677,7 @@ class PlayerViewModel(
                     teardownCast()
                     onHint(hintCastFailed)
                 }
-                val source = engine.prepareCastSource()
+                val source = engine.prepareCastSource(cast.maxVideoHeight())
                 if (token != playbackRequestSeq || !cast.state.value.remoteSession) return@launch
                 if (source == null) {
                     handoffFailed()
@@ -1166,7 +1166,7 @@ class PlayerViewModel(
         userCastStop = false
         val token = playbackRequestSeq
         viewModelScope.launch {
-            val source = engine.prepareCastSource()
+            val source = engine.prepareCastSource(cast.maxVideoHeight())
             if (token != playbackRequestSeq || !cast.state.value.remoteSession) return@launch
             if (source == null) { teardownCast(); return@launch }
             engine.pause()
@@ -1186,7 +1186,7 @@ class PlayerViewModel(
      */
     private fun recastPublishedSource() {
         if (!cast.state.value.remoteSession) return
-        val source = engine.currentCastSource() ?: return
+        val source = engine.currentCastSource(cast.maxVideoHeight()) ?: return
         if (!cast.startCasting(source, engine.snapshot.value.positionMs)) {
             teardownCast()
         }

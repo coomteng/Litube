@@ -553,7 +553,7 @@ class PlayerViewModelTest {
         override fun setQuality(label: String?) = Unit
         override fun setSubtitle(trackKey: String?): Boolean = true
         override fun setAudioTrack(trackKey: String?) = Unit
-        override fun currentCastSource(): CastSource? = null
+        override fun currentCastSource(maxHeight: Int): CastSource? = null
         override fun refreshCastUrl(token: String, videoId: String?, itag: Int?): String? = null
         override fun attachCastPlayer(delegate: Player?): Boolean = false
         override fun setQueueNavigation(hasNext: Boolean, hasPrevious: Boolean) = Unit

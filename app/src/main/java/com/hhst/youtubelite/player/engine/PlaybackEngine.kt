@@ -183,10 +183,13 @@ interface PlaybackApi {
     /** False when [trackKey] has no parseable track; the caller keeps its UI state. */
     fun setSubtitle(trackKey: String?): Boolean
     fun setAudioTrack(trackKey: String?)
-    /** Adaptive video/audio pair currently loaded, for Cast / link projection. */
-    fun currentCastSource(): CastSource?
+    /**
+     * Adaptive video/audio pair currently loaded, for Cast / link projection.
+     * [maxHeight] caps the video rendition (receivers that reject 1080p DASH).
+     */
+    fun currentCastSource(maxHeight: Int = Int.MAX_VALUE): CastSource?
     /** Materialize file formats only when a receiver actually needs them. */
-    suspend fun prepareCastSource(): CastSource? = currentCastSource()
+    suspend fun prepareCastSource(maxHeight: Int = Int.MAX_VALUE): CastSource? = currentCastSource(maxHeight)
     /** Re-extracts and returns a fresh URL for a published cast track. */
     fun refreshCastUrl(token: String, videoId: String? = null, itag: Int? = null): String?
     fun backupCastUrl(token: String, videoId: String?, itag: Int?, failedProfile: String?): String? = null
@@ -1313,19 +1316,20 @@ class PlaybackEngine(
      * 1080p so the LAN proxy is not saturated. A muxed stream carries its own
      * audio and may serve as the video representation alone.
      */
-    override fun currentCastSource(): CastSource? {
+    override fun currentCastSource(maxHeight: Int): CastSource? {
         val meta = currentMetadata ?: return null
         val id = _snapshot.value.videoId ?: return null
         // A failed load (extraction error) leaves the previous video's stream
         // data in place; casting it under the NEW id would play the old video.
         if (meta.id != id) return null
         val pool = castCandidates()
-        val preferred = _snapshot.value.qualityLabel
-        val avcCapped = pool.filter { isAvc(it) && it.height <= CAST_MAX_HEIGHT }
+        val cap = minOf(CAST_MAX_HEIGHT, maxHeight)
+        val preferred = _snapshot.value.qualityLabel?.takeIf { StreamSelection.parseHeight(it) <= cap }
+        val avcCapped = pool.filter { isAvc(it) && it.height <= cap }
         val video = StreamSelection.selectVideo(avcCapped, preferred)
-            ?: pool.firstOrNull { isAvc(it) && it.height <= CAST_MAX_HEIGHT }
+            ?: pool.firstOrNull { isAvc(it) && it.height <= cap }
+            ?: pool.firstOrNull { it.height <= cap }
             ?: pool.firstOrNull { isAvc(it) }
-            ?: pool.firstOrNull { it.height <= CAST_MAX_HEIGHT }
             ?: pool.firstOrNull()
         val audio = castAudio(video)
         val progressive = progressiveCandidate()
@@ -1350,8 +1354,8 @@ class PlaybackEngine(
             .filter { StreamSelection.isMuxed(it) && it.url.isNotBlank() && it.mimeType.contains("mp4", true) }
             .maxByOrNull { it.height }
 
-    override suspend fun prepareCastSource(): CastSource? {
-        currentCastSource()?.let { return it }
+    override suspend fun prepareCastSource(maxHeight: Int): CastSource? {
+        currentCastSource(maxHeight)?.let { return it }
         val id = _snapshot.value.videoId ?: return null
         val generation = playbackGeneration.get()
         val media = try { withContext(Dispatchers.IO) { extractor.awaitMedia(id) } }
@@ -1359,7 +1363,7 @@ class PlaybackEngine(
             catch (_: Exception) { return null }
         if (!stillCurrent(generation) || _snapshot.value.videoId != id || media.first.id != id) return null
         currentStream = media.second
-        return currentCastSource()
+        return currentCastSource(maxHeight)
     }
 
     /**
