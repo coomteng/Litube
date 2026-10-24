@@ -134,7 +134,7 @@ object WebViewFactory {
             setProgressViewOffset(true, 24, 96)
         }
         val downloadBridge = DownloadWebBridge(appContext = appContext, tabId = tabId)
-        val webView = WebView(context).apply {
+        val webView = BrowserWebView(context).apply {
             BrowserDiagnostics.register(this, bridge::diagnosticContext)
             layoutParams = FrameLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,

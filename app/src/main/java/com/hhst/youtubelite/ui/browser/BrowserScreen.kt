@@ -70,6 +70,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.hhst.youtubelite.R
 import com.hhst.youtubelite.browser.Bridge
 import com.hhst.youtubelite.browser.BrowserHost
+import com.hhst.youtubelite.browser.BrowserWebView
 import com.hhst.youtubelite.browser.PageKind
 import com.hhst.youtubelite.browser.PlayerHooks
 import com.hhst.youtubelite.browser.Tab
@@ -401,6 +402,7 @@ fun BrowserScreen(
             val active = latestHosts.value[latestActiveId.value]?.webView
             when (event) {
                 Lifecycle.Event.ON_RESUME -> {
+                    latestHosts.value.values.forEach { (it.webView as? BrowserWebView)?.keepVisible = false }
                     active?.evaluateJavascript("window.dispatchEvent(new CustomEvent('tabVisibilityChanged',{detail:{active:true}}));", null)
                     playerViewModel.setVideoVisible(playerViewModel.uiState.value.visible)
                     active?.onResume()
@@ -409,11 +411,21 @@ fun BrowserScreen(
                 Lifecycle.Event.ON_PAUSE -> {
                     val pausedInPip = Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && activity?.isInPictureInPictureMode == true
                     playerViewModel.setVideoVisible(pausedInPip)
+                    // Shorts play inside the WebView, not the native player. With background
+                    // play on, keep the active Shorts host running through screen-off /
+                    // backgrounding the same way long videos keep running: no tab-hidden
+                    // signal, no WebView.onPause(), timers stay on. shorts.js masks the
+                    // document's hidden state so YouTube's player does not stop itself.
+                    val backgroundShorts = !pausedInPip && PageKind.isShorts(viewModel.uiState.value.url) &&
+                        extensionManager.isEnabled(PreferenceKeys.ENABLE_BACKGROUND_PLAY)
+                    val keepAlive = if (backgroundShorts) latestHosts.value[latestActiveId.value]?.webView else null
+                    (keepAlive as? BrowserWebView)?.keepVisible = true
                     latestHosts.value.values.forEach {
+                        if (it.webView === keepAlive) return@forEach
                         it.webView.evaluateJavascript("window.dispatchEvent(new CustomEvent('tabVisibilityChanged',{detail:{active:false}}));", null)
                         it.webView.onPause()
                     }
-                    releaseTimers()
+                    if (keepAlive == null) releaseTimers()
                     // "Visible" not "playing": pausing an already-paused player is harmless.
                     val playerVisible = playerViewModel.uiState.value.visible
                     if (playerVisible && !pausedInPip && !playerViewModel.audioOnlyBackground &&

@@ -5,6 +5,28 @@
   let active = true, key = '', video = null, readyAt = 0, attempts = 0;
   let userMuted = false, reported = false, hiddenVideo = null, userPaused = null, touch = null;
   const isShorts = Lite.isShorts;
+  const backgroundPlay = () => { try { return !!Lite.prefs().enable_background_play; } catch (_) { return false; } };
+  // Screen off / app to background: Android marks the document hidden and YouTube's player reacts
+  // by calling stopVideo() (it unloads the <video> entirely). Long videos keep playing because
+  // they run in the native player + foreground service; Shorts live in this document. With
+  // background play on, hide the hidden state from the page so the Short plays like a long video.
+  // Tab switches inside the app still stop it (tabVisibilityChanged below), and the native player
+  // never plays at the same time (PlayerViewModel.onShortsOpened pauses it).
+  let masked = false;
+  const descriptor = (name) => Object.getOwnPropertyDescriptor(Document.prototype, name);
+  const originalHidden = descriptor('hidden'), originalState = descriptor('visibilityState');
+  function maskHidden(on) {
+    if (on === masked || !originalHidden || !originalState) return;
+    masked = on;
+    if (on) {
+      Object.defineProperty(Document.prototype, 'hidden', { configurable: true, get() { return false; } });
+      Object.defineProperty(Document.prototype, 'visibilityState', { configurable: true, get() { return 'visible'; } });
+    } else {
+      Object.defineProperty(Document.prototype, 'hidden', originalHidden);
+      Object.defineProperty(Document.prototype, 'visibilityState', originalState);
+    }
+  }
+  const reallyHidden = () => originalState ? originalState.get.call(document) === 'hidden' : document.hidden;
   const currentVideo = () => Array.from(document.querySelectorAll('video')).find(v => {
     const r = v.getBoundingClientRect();
     return r.width > 40 && r.height > 40 && r.top < innerHeight && r.bottom > 0;
@@ -24,7 +46,7 @@
       key = id; video = next; hiddenVideo = null; readyAt = 0; attempts = 0; reported = false;
       userPaused = null; touch = null;
     }
-    if (!active || document.hidden) { stop(); return true; }
+    if (!active || (reallyHidden() && !backgroundPlay())) { stop(); return true; }
     if (!video || video.readyState < 2) return true;
     if (hiddenVideo === video) {
       hiddenVideo = null;
@@ -56,9 +78,14 @@
     if (!active && isShorts()) stop();
     else ensure();
   });
-  document.addEventListener('visibilitychange', () => {
-    if (document.hidden && isShorts()) stop(); else ensure();
-  });
+  // Capturing listener registered at document-start: runs before YouTube's own handlers, which
+  // then read the masked (visible) state and do not stop the player.
+  document.addEventListener('visibilitychange', e => {
+    const hidden = reallyHidden();
+    if (hidden && isShorts() && active && backgroundPlay()) { maskHidden(true); e.stopImmediatePropagation(); return; }
+    if (!hidden) maskHidden(false);
+    if (hidden && isShorts()) stop(); else ensure();
+  }, true);
   document.addEventListener('click', e => {
     if (!isShorts()) return;
     const control = e.target?.closest?.('button,[role="button"]');
