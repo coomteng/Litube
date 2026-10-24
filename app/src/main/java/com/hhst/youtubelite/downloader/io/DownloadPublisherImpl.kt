@@ -332,7 +332,7 @@ fun createPublishBackend(context: Context, sdk: Int = Build.VERSION.SDK_INT): Pu
     return if (sdk >= 29) {
         MediaStorePublishBackend(context)
     } else {
-        val dir = File(context.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS), "LitubeX")
+        val dir = File(context.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS), "Litube Plus")
         LocalPublishBackend(
             outputDir = dir,
             uriPrefix = "content://${context.packageName}$DOWNLOAD_FILE_PROVIDER_SUFFIX/downloads/",

@@ -72,7 +72,7 @@ jobs:
             base=$(basename "$f" .apk)                     # app-arm64-v8a-release[-unsigned] | app-universal-release
             abi=${base#app-}; abi=${abi%-release}; abi=${abi%-release-unsigned}
             signed=release; [[ "$base" == *-unsigned ]] && signed=release-unsigned
-            cp "$f" "$out/litubex-${version}-${abi}-${signed}.apk"
+            cp "$f" "$out/litube-plus-${version}-${abi}-${signed}.apk"
           done
           [ -d app/build/outputs/mapping/release ] && (cd app/build/outputs/mapping/release && zip -qr "$GITHUB_WORKSPACE/$out/mapping-release-${version}.zip" .)
           (cd "$out" && sha256sum *.apk > SHA256SUMS.txt)
@@ -98,9 +98,9 @@ jobs:
           | \`*-armeabi-v7a-release.apk\` | 32-bit ARM (older/budget phones) |
           | \`*-x86_64-release.apk\` / \`*-x86-release.apk\` | emulators, Chromebooks |
 
-          \`SHA256SUMS.txt\` lists every file. LitubeX is a separate app (package \`com.coomteng.litube\`): it installs next to upstream Litube and does not replace it."
+          \`SHA256SUMS.txt\` lists every file. Litube Plus is a separate app (package \`com.coomteng.litube\`): it installs next to upstream Litube and does not replace it."
           if gh release view "$TAG" >/dev/null 2>&1; then
             gh release upload "$TAG" dist/* --clobber
           else
-            gh release create "$TAG" dist/* --title "LitubeX $TAG" --notes "$notes" --latest
+            gh release create "$TAG" dist/* --title "Litube Plus $TAG" --notes "$notes" --latest
           fi

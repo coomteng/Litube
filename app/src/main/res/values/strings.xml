@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources xmlns:tools="http://schemas.android.com/tools">
-    <string name="app_name">LitubeX</string>
+    <string name="app_name">Litube Plus</string>
     <string name="player_audio_only">Listen in background</string>
     <string name="back_again_to_exit">Press Back again to exit</string>
     <string name="navigate_back">Back</string>

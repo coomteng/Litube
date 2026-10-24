@@ -1,17 +1,46 @@
-Litube
-============
+Litube Plus
+===========
 
-Litube is an Android video client with an embedded browser, native playback and built-in downloads.
+Litube Plus is an Android video client with an embedded browser, native playback and built-in
+downloads. It is a fork of [Litube](https://github.com/HydeYYHH/Litube) by HydeYYHH (GPL-3.0),
+tuned for speed and for a few devices upstream does not special-case, and shipped as a
+**separate app** (`com.coomteng.litube`) so it installs next to upstream rather than replacing it.
 
-Requires Android 6.0 (API 23) or later and an up-to-date Android System WebView. Picture-in-Picture is available on Android 8.0 or later when the device supports it.
+Requires Android 6.0 (API 23) or later and an up-to-date Android System WebView.
+Picture-in-Picture is available on Android 8.0 or later when the device supports it.
 
 ## Releases
 
-**Current version: 3.0.3**
+Versions are `<upstream>.<fork revision>`, e.g. 3.0.3.5 is upstream 3.0.3 plus five fork
+revisions. Signed release APKs for every ABI are attached to each
+[release](https://github.com/coomteng/litube_plus/releases):
 
-Download installation packages and read release notes on the [releases page](https://github.com/HydeYYHH/Litube/releases).
+| file | what |
+|---|---|
+| `litube-plus-<ver>-universal-release.apk` | all ABIs, R8-minified, release-signed — pick this if unsure |
+| `litube-plus-<ver>-arm64-v8a-release.apk` | 64-bit ARM (most phones since ~2017), smallest |
+| `litube-plus-<ver>-armeabi-v7a-release.apk` | 32-bit ARM |
+| `litube-plus-<ver>-x86_64-release.apk`, `-x86-` | emulators / Chromebooks |
 
-## Features
+`SHA256SUMS.txt` lists every file. They are built by `.github/workflows/release.yml` on every
+`v*` tag and signed with this fork's own key; the app's About screen checks this repository
+for updates. [Obtainium](https://github.com/ImranR98/Obtainium) can track the repository
+URL directly.
+
+## What Litube Plus changes
+
+* Shorts tab pre-warmed in the background: bottom-bar Shorts → playing in ~1 s instead of ~4 s.
+* Shorts automatic quality follows the screen (1080p on a 1080p panel; upstream's WebView
+  player sizes it to the CSS viewport and sits at 360p).
+* Faster watch start-up: gzip'd HLS playlists, cookie reads off the media read path.
+* Shorts keep playing with the screen off / in the background when background play is on.
+* Exynos 9610/9611 (Galaxy A50/A51/M31, Tab S6 Lite): VP9 kept off the hardware decoder
+  whose output corrupts on fast motion; decoder rebuilt on surface and resolution changes.
+  Exposed as a "Prefer H.264 over VP9" toggle, on by default on those SoCs.
+
+Everything else is upstream Litube as of the version in the first three numbers.
+
+## Features (from upstream)
 
 * Ad-free playback and configurable sponsor segment skipping.
 * Native controls for quality, playback speed, subtitles and audio tracks.
@@ -24,36 +53,22 @@ Download installation packages and read release notes on the [releases page](htt
 * Settings backup and restore.
 * Diagnostic reports that can be saved or shared.
 
-## Roadmap
+## Building
 
-* [ ] Replace the WebView-based architecture with native Android components (planned for v4)
+Debug: `./gradlew assembleDebug` (package `com.coomteng.litube.debug`, installs side by side).
 
-## Screenshots
+Release: `./gradlew assembleRelease -PabiSplits=true` with `LITUBE_KEYSTORE`,
+`LITUBE_KEYSTORE_PASSWORD` (and optionally `LITUBE_KEY_ALIAS`, `LITUBE_KEY_PASSWORD`) in the
+environment. Unset, the release build is left unsigned.
 
-<img title="" src="https://github.com/HydeYYHH/litube/blob/master/fastlane/metadata/android/en-US/images/phoneScreenshots/1.png" alt="" width="200"><img title="" src="https://github.com/HydeYYHH/litube/blob/master/fastlane/metadata/android/en-US/images/phoneScreenshots/2.jpg" alt="" width="200"><img title="" src="https://github.com/HydeYYHH/litube/blob/master/fastlane/metadata/android/en-US/images/phoneScreenshots/3.png" alt="" width="200">
-
+Tests: `./gradlew testDebugUnitTest` and `node --test app/src/test/script/*.test.cjs`.
 
 ## Contributing
 
-Report issues with the app version, device model, Android version and steps to reproduce. Include a diagnostic archive when available. Contributions and pull requests are welcome.
+Report issues with the app version, device model, Android version and steps to reproduce.
+Include a diagnostic archive when available. Fixes that are not fork-specific are better
+sent upstream to [HydeYYHH/Litube](https://github.com/HydeYYHH/Litube).
 
-## LitubeX — this fork
+## License
 
-LitubeX is upstream Litube plus performance work (Shorts pre-warm, faster HLS start-up),
-shipped as a **separate app** (`com.coomteng.litube`) so it installs alongside Litube.
-Versions are `<upstream>.<fork revision>`, e.g. 3.0.3.1. Pre-built release APKs for every
-ABI are attached to each [release](https://github.com/coomteng/Litube/releases):
-
-| file | what |
-|---|---|
-| `litubex-<ver>-universal-release.apk` | all ABIs, R8-minified, release-signed — pick this if unsure |
-| `litubex-<ver>-arm64-v8a-release.apk` | 64-bit ARM (most phones since ~2017), smallest |
-| `litubex-<ver>-armeabi-v7a-release.apk` | 32-bit ARM |
-| `litubex-<ver>-x86_64-release.apk`, `-x86-` | emulators / Chromebooks |
-
-They are built by `.github/workflows/release.yml` on every `v*` tag and signed with this
-fork's own key.
-
-Local release builds: `./gradlew assembleRelease -PabiSplits=true` with
-`LITUBE_KEYSTORE`, `LITUBE_KEYSTORE_PASSWORD` (and optionally `LITUBE_KEY_ALIAS`,
-`LITUBE_KEY_PASSWORD`) in the environment.
+GPL-3.0, same as upstream. See [LICENSE](LICENSE).

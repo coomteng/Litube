@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">LitubeX</string>
+    <string name="app_name">Litube Plus</string>
     <string name="player_audio_only">ຟັງໃນພື້ນຫຼັງ</string>
     <string name="back_again_to_exit">ກົດກັບຄືນອີກຄັ້ງເພື່ອອອກ</string>
     <string name="navigate_back">ກັບຄືນໄປບ່ອນ</string>

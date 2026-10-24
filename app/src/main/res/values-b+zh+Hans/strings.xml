@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">LitubeX</string>
+    <string name="app_name">Litube Plus</string>
     <string name="player_audio_only">后台收听</string>
     <string name="back_again_to_exit">再按一次返回键退出</string>
     <string name="navigate_back">返回</string>

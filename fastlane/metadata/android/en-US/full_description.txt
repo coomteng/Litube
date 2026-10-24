@@ -1,4 +1,4 @@
-Litube is an Android video client with an embedded browser, native playback and built-in downloads.
+Litube Plus is an Android video client with an embedded browser, native playback and built-in downloads — a fork of Litube tuned for speed, installable alongside it.
 
 <b>Features</b>
 * Ad-free playback and configurable sponsor segment skipping
