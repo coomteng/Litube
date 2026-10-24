@@ -75,6 +75,15 @@ class LocalStreamProxyRangeTest {
     }
 
     @Test
+    fun contentLengthFromUrl_readsClen() {
+        assertEquals(12345678L, LocalStreamProxy.contentLengthFromUrl("https://r1.googlevideo.com/videoplayback?expire=1&clen=12345678&dur=10.5"))
+        assertEquals(42L, LocalStreamProxy.contentLengthFromUrl("https://x/v?clen=42"))
+        assertEquals(-1L, LocalStreamProxy.contentLengthFromUrl("https://x/v?xclen=42"))
+        assertEquals(-1L, LocalStreamProxy.contentLengthFromUrl("https://x/v?clen=0"))
+        assertEquals(-1L, LocalStreamProxy.contentLengthFromUrl(null))
+    }
+
+    @Test
     fun backfill_staleConfigId_ignoredAfterSameVideoReconfigure() {
         val proxy = newProxy()
         configureVideo(proxy, contentLength = 0L)

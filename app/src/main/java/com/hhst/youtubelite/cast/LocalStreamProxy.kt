@@ -86,6 +86,12 @@ class LocalStreamProxy(
     private val configGen = AtomicLong()
 
     @Volatile var urlRefresher: UrlRefresher? = null
+    /**
+     * False disables the per-request chunk cap on ranged GETs: DLNA renderers
+     * open `bytes=0-` once and stream the whole file from that connection, so a
+     * 256 KiB answer makes them stop after a few seconds.
+     */
+    @Volatile var rangeChunkCap: Boolean = true
     @Volatile private var manifestXml: String? = null
     @Volatile private var videoTitle: String? = null
     @Volatile private var currentVideoId: String? = null
@@ -330,7 +336,7 @@ class LocalStreamProxy(
             return text(Response.Status.FORBIDDEN, "Stale generation")
         }
         val ua = header(session, "user-agent")
-        val chunkMax = chunkMaxBytes(ua)
+        val chunkMax = if (rangeChunkCap) chunkMaxBytes(ua) else Int.MAX_VALUE
         var rangeStart = 0L
         var rangeEnd = if (info.contentLength > 0) info.contentLength - 1 else LENGTH_UNSET
         var hasRange = false
@@ -572,6 +578,11 @@ class LocalStreamProxy(
             response = newFixedLengthResponse(Response.Status.OK, mime, input, bodyLength)
         }
         response.addHeader("Accept-Ranges", "bytes")
+        if (!rangeChunkCap) {
+            // DLNA renderers ask for these to decide whether they may seek.
+            response.addHeader("contentFeatures.dlna.org", "DLNA.ORG_OP=01;DLNA.ORG_CI=0;DLNA.ORG_FLAGS=01700000000000000000000000000000")
+            response.addHeader("transferMode.dlna.org", "Streaming")
+        }
         addCors(response, ua)
         return response
     }
@@ -723,6 +734,18 @@ class LocalStreamProxy(
          */
         internal fun chunkMaxBytes(ua: String?): Int =
             if (isReceiverUa(ua)) DEFAULT_CHUNK else LINK_PEER_CHUNK
+
+        /**
+         * googlevideo URLs carry the total byte size as `clen=`; progressive
+         * clients (DLNA renderers) need Content-Length up front to seek, and
+         * it lets the first open-ended request serve exact bounds.
+         */
+        internal fun contentLengthFromUrl(url: String?): Long {
+            if (url.isNullOrEmpty()) return -1L
+            val match = CLEN_PARAM.find(url) ?: return -1L
+            return match.groupValues[1].toLongOrNull()?.takeIf { it > 0 } ?: -1L
+        }
+        private val CLEN_PARAM = Regex("[?&]clen=(\\d+)")
 
         /**
          * HEAD of [get]: empty body, same status/mime/length/headers.
