@@ -38,6 +38,8 @@
     <string name="skip_sponsors_highlight">Skip highlights</string>
     <string name="remember_last_position">Remember position</string>
     <string name="remember_quality">Remember video quality</string>
+    <string name="avoid_vp9">Prefer H.264 over VP9</string>
+    <string name="avoid_vp9_summary">Avoids the VP9 hardware decoder. On by default on Exynos 9610/9611 (Galaxy A50/A51, Tab S6 Lite), whose VP9 output breaks up on fast motion. Caps most videos at 1080p30.</string>
     <string name="remember_playback_speed">Remember speed</string>
     <string name="remember_resize_mode">Remember resize mode</string>
     <string name="use_original_title">Use original title</string>

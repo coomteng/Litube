@@ -52,6 +52,7 @@ data class Extension(
                     toggle(PreferenceKeys.REMEMBER_PLAYBACK_SPEED, R.string.remember_playback_speed),
                     toggle(PreferenceKeys.REMEMBER_RESIZE_MODE, R.string.remember_resize_mode),
                     toggle(PreferenceKeys.USE_ORIGINAL_TITLE, R.string.use_original_title),
+                    toggle(PreferenceKeys.AVOID_VP9, R.string.avoid_vp9, R.string.avoid_vp9_summary),
                 ),
             ),
             group(

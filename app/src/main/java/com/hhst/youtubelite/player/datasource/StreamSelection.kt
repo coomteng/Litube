@@ -85,7 +85,7 @@ object StreamSelection {
      * rep it cannot decode (which would burn another recovery round).
      */
     fun preferPlayable(formats: List<Format>, allowAndroidVr: Boolean = false): List<Format> {
-        val decodable = formats.filter(CodecCapabilities::isDecodable)
+        val decodable = avoidBrokenVp9(formats.filter(CodecCapabilities::isDecodable))
         if (decodable.any { it.requestPlan != null }) return decodable.filter { it.requestPlan != null }
         val withPot = decodable.filter(::hasPoToken)
         if (withPot.isNotEmpty()) return withPot
@@ -93,6 +93,17 @@ object StreamSelection {
         if (stable.isNotEmpty()) return stable
         if (allowAndroidVr && decodable.isNotEmpty()) return decodable
         return emptyList()
+    }
+
+    /**
+     * On SoCs whose VP9 hardware decoder corrupts (see [DecoderQuirks]), drop
+     * VP9 while another video codec remains; an all-VP9 pool is kept so the
+     * video still plays rather than failing outright.
+     */
+    internal fun avoidBrokenVp9(formats: List<Format>): List<Format> {
+        if (!DecoderQuirks.shouldAvoidVp9()) return formats
+        val kept = formats.filter { it.audioOnly || !DecoderQuirks.isVp9(it.codec) }
+        return if (kept.any { !it.audioOnly }) kept else formats
     }
 
     fun hasPoToken(format: Format): Boolean {

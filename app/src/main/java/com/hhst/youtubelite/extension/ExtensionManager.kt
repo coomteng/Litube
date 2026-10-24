@@ -35,13 +35,13 @@ class ExtensionManager(private val store: PrefStore) {
 
     fun isEnabled(key: String): Boolean {
         val pref = prefKey(key)
-        val default = PreferenceKeys.DEFAULTS[key] == true
+        val default = PreferenceKeys.defaultOf(key)
         return store.getBool(pref, default)
     }
 
     fun setEnabled(key: String, enabled: Boolean) {
         val pref = prefKey(key)
-        val default = PreferenceKeys.DEFAULTS[key] == true
+        val default = PreferenceKeys.defaultOf(key)
         val previous = if (store.contains(pref)) store.getBool(pref, default) else default
         store.putBool(pref, enabled)
         if (previous != enabled) {
@@ -55,7 +55,8 @@ class ExtensionManager(private val store: PrefStore) {
         val changedKeys = mutableListOf<String>()
         if (hapticStrength() != 30) changedKeys += PreferenceKeys.HAPTIC_STRENGTH
         store.putLong(prefKey(PreferenceKeys.HAPTIC_STRENGTH), 30L)
-        for ((key, value) in PreferenceKeys.DEFAULTS) {
+        for (key in PreferenceKeys.DEFAULTS.keys) {
+            val value = PreferenceKeys.defaultOf(key)
             val pref = prefKey(key)
             if (!store.contains(pref) || store.getBool(pref, value) != value) {
                 changedKeys += key
@@ -110,10 +111,10 @@ class ExtensionManager(private val store: PrefStore) {
 
     private fun seedDefaults() {
         migrateGestures()
-        for ((key, value) in PreferenceKeys.DEFAULTS) {
+        for (key in PreferenceKeys.DEFAULTS.keys) {
             val pref = prefKey(key)
             if (!store.contains(pref)) {
-                store.putBool(pref, value)
+                store.putBool(pref, PreferenceKeys.defaultOf(key))
             }
         }
     }

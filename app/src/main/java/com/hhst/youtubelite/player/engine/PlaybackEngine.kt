@@ -1,4 +1,5 @@
 package com.hhst.youtubelite.player.engine
+import com.hhst.youtubelite.player.datasource.DecoderQuirks
 import com.hhst.youtubelite.player.datasource.PlaybackRecovery
 import com.hhst.youtubelite.player.datasource.PlaybackRecovery.Reason as RecoveryReason
 
@@ -263,7 +264,7 @@ class PlaybackEngine(
     private val trackSelector = DefaultTrackSelector(context, StartCappedSelectionFactory())
 
     private val player: ExoPlayer = ExoPlayer.Builder(context)
-        .setRenderersFactory(DefaultRenderersFactory(context).setEnableDecoderFallback(true))
+        .setRenderersFactory(QuirkAwareRenderersFactory(context).setEnableDecoderFallback(true))
         .setTrackSelector(trackSelector)
         .setLoadControl(defaultLoadControl())
         .setAudioAttributes(
@@ -423,6 +424,11 @@ class PlaybackEngine(
     }
 
     init {
+        // Codec avoidance follows the toggle, whose default is device-derived.
+        applyCodecQuirks()
+        prefs.addOnChangedListener { key ->
+            if (key == PreferenceKeys.AVOID_VP9 || key == "*") handler.post { applyCodecQuirks() }
+        }
         val telemetry = PlaybackTelemetry()
         player.addAnalyticsListener(telemetry)
         player.addAnalyticsListener(object : AnalyticsListener {
@@ -1010,6 +1016,14 @@ class PlaybackEngine(
             }
         }
         return best
+    }
+
+    /** Seeds [DecoderQuirks] from the toggle and steers the selector's codec preference. */
+    private fun applyCodecQuirks() {
+        DecoderQuirks.avoidVp9 = prefs.isEnabled(PreferenceKeys.AVOID_VP9)
+        trackSelector.parameters = trackSelector.parameters.buildUpon()
+            .setPreferredVideoMimeTypes(*DecoderQuirks.preferredVideoMimeTypes())
+            .build()
     }
 
     /**

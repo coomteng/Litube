@@ -4,6 +4,7 @@ import com.hhst.youtubelite.extractor.Format
 import org.junit.After
 import org.junit.Before
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -17,6 +18,7 @@ class StreamSelectionTest {
     @After
     fun tearDown() {
         CodecCapabilities.resetForTest()
+        DecoderQuirks.setForTest()
     }
 
     @Test
@@ -273,5 +275,57 @@ class StreamSelectionTest {
                 StreamSelection.isWindowExempt(f),
             )
         }
+    }
+
+    @Test
+    fun avoidBrokenVp9_dropsVp9WhileAnotherCodecRemains() {
+        DecoderQuirks.setForTest(detected = true)
+        val vp9 = format(1080, fps = 60, codec = "vp09.00.40.08")
+        val avc = format(1080, codec = "avc1.640028")
+        val av1 = format(720, codec = "av01.0.05M.08")
+        assertEquals(listOf(avc, av1), StreamSelection.avoidBrokenVp9(listOf(vp9, avc, av1)))
+        // An all-VP9 pool is kept: corrupt-prone beats unplayable.
+        assertEquals(listOf(vp9), StreamSelection.avoidBrokenVp9(listOf(vp9)))
+        // Audio is never touched.
+        val opus = format(0, codec = "opus").copy(videoOnly = false, audioOnly = true, mimeType = "audio/webm")
+        assertEquals(listOf(opus, avc), StreamSelection.avoidBrokenVp9(listOf(opus, vp9, avc)))
+    }
+
+    @Test
+    fun avoidBrokenVp9_isNoOpElsewhere() {
+        DecoderQuirks.setForTest(detected = false)
+        val vp9 = format(1080, codec = "vp9")
+        val avc = format(1080, codec = "avc1")
+        assertEquals(listOf(vp9, avc), StreamSelection.avoidBrokenVp9(listOf(vp9, avc)))
+    }
+
+    @Test
+    fun avoidBrokenVp9_followsTheToggleOverDetection() {
+        DecoderQuirks.setForTest(detected = true)
+        DecoderQuirks.avoidVp9 = false
+        val vp9 = format(1080, codec = "vp9")
+        val avc = format(1080, codec = "avc1")
+        assertEquals(listOf(vp9, avc), StreamSelection.avoidBrokenVp9(listOf(vp9, avc)))
+        DecoderQuirks.setForTest(detected = false)
+        DecoderQuirks.avoidVp9 = true
+        assertEquals(listOf(avc), StreamSelection.avoidBrokenVp9(listOf(vp9, avc)))
+    }
+
+    @Test
+    fun decoderQuirks_detectsByPlatformAndCodecName() {
+        DecoderQuirks.setForTest(platform = "universal9611")
+        assertTrue(DecoderQuirks.hasBrokenVp9Decoder())
+        DecoderQuirks.setForTest(platform = "kirin970")
+        // No MediaCodecList in unit tests (returns default); platform alone decides.
+        assertFalse(DecoderQuirks.hasBrokenVp9Decoder())
+        assertTrue(DecoderQuirks.needsSetOutputSurfaceWorkaround("OMX.Exynos.vp9.dec"))
+        assertTrue(DecoderQuirks.needsSetOutputSurfaceWorkaround("OMX.Exynos.avc.dec"))
+        assertFalse(DecoderQuirks.needsSetOutputSurfaceWorkaround("c2.qti.avc.decoder"))
+        assertTrue(DecoderQuirks.isVp9("vp09.00.40.08")); assertTrue(DecoderQuirks.isVp9("vp9"))
+        assertFalse(DecoderQuirks.isVp9("avc1.640028")); assertFalse(DecoderQuirks.isVp9(null))
+        DecoderQuirks.setForTest(detected = true)
+        assertEquals(listOf("video/avc", "video/hevc", "video/av01"), DecoderQuirks.preferredVideoMimeTypes().toList())
+        DecoderQuirks.setForTest(detected = false)
+        assertEquals(0, DecoderQuirks.preferredVideoMimeTypes().size)
     }
 }

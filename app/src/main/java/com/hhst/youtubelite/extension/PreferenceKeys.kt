@@ -2,10 +2,22 @@ package com.hhst.youtubelite.extension
 
 /** Preference keys and first-launch defaults. Strings match the existing MMKV layout. */
 object PreferenceKeys {
+    /**
+     * First-launch / reset default for [key]. [DEFAULTS] holds the static
+     * table; [AVOID_VP9] is device-derived (on where the VP9 decoder is known
+     * to corrupt, see DecoderQuirks), so it goes through here.
+     */
+    fun defaultOf(key: String): Boolean = when (key) {
+        AVOID_VP9 -> com.hhst.youtubelite.player.datasource.DecoderQuirks.hasBrokenVp9Decoder()
+        else -> DEFAULTS[key] == true
+    }
+
     const val HAPTIC_STRENGTH = "haptic_strength"
     const val ENABLE_DISPLAY_DISLIKES = "enable_display_dislikes"
     const val ENABLE_HIDE_SHORTS = "enable_hide_shorts"
     const val REMEMBER_QUALITY = "remember_quality"
+    /** Keep VP9 out of the video pool (default on for SoCs with a broken VP9 decoder). */
+    const val AVOID_VP9 = "avoid_vp9"
     const val REMEMBER_PLAYBACK_SPEED = "remember_playback_speed"
     const val REMEMBER_LAST_POSITION = "remember_last_position"
     const val REMEMBER_RESIZE_MODE = "remember_resize_mode"
@@ -79,6 +91,7 @@ object PreferenceKeys {
         SPONSOR_COUNTDOWN to true,
         REMEMBER_LAST_POSITION to true,
         REMEMBER_QUALITY to true,
+        AVOID_VP9 to false,
         ENABLE_BACKGROUND_PLAY to true,
         ENABLE_PIP to true,
         ENABLE_IN_APP_MINI_PLAYER to true,

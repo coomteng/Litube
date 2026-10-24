@@ -38,6 +38,8 @@
     <string name="skip_sponsors_highlight">跳过精彩片段</string>
     <string name="remember_last_position">记住上次观看位置</string>
     <string name="remember_quality">记住画质</string>
+    <string name="avoid_vp9">优先 H.264 而非 VP9</string>
+    <string name="avoid_vp9_summary">不使用 VP9 硬件解码。Exynos 9610/9611（Galaxy A50/A51、Tab S6 Lite）上默认开启，这些芯片的 VP9 解码在快速运动画面会花屏。多数视频最高 1080p30。</string>
     <string name="remember_playback_speed">记住播放速度</string>
     <string name="remember_resize_mode">记住缩放模式</string>
     <string name="use_original_title">使用原标题</string>
