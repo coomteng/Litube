@@ -7,7 +7,7 @@
   const qualityIcon = 'M120-160v-640h720v640H120Zm80-80h560v-480H200v480Zm80-80v-240h80v80h80v-80h80v240h-80v-80h-80v80h-80Zm280 0v-240h120q40 0 40 40v160q0 40-40 40H560Zm80-80h40v-80h-40v80Z';
   const heights = { tiny: 144, small: 240, medium: 360, large: 480, hd720: 720,
     hd1080: 1080, hd1440: 1440, hd2160: 2160, hd2880: 2880, hd4320: 4320 };
-  let preference = null, lastPlayer = null, lastVideo = '', panel = null, fromPlayerMenu = false;
+  let preference = null, lastApplied = '', panel = null, fromPlayerMenu = false;
   const isShorts = Lite.isShorts;
   function player() {
     for (const video of document.querySelectorAll('video')) {
@@ -34,14 +34,48 @@
     } catch (_) {}
     return heights[level] ? heights[level] + 'p' : level || Lite.text('unavailable');
   }
+  /** The MWEB player sizes "auto" to the CSS viewport (360p on a 360x656
+   *  layout) and never steps up, whatever the bandwidth. Pick the smallest
+   *  level that covers the physical pixels of the video's short side (a
+   *  vertical 1080p Short is 1080x1920), with 10% slack so a 1107 px wide
+   *  screen still settles on 1080p, and cap at 1080p: at phone viewing
+   *  distance a 6-7" screen is already past the eye's ~300 ppi limit there,
+   *  so 1440p only costs data. */
+  const AUTO_CAP = heights.hd1080;
+  function floorLevel(host) {
+    const available = levels(host).filter(level => heights[level]).sort((a, b) => heights[a] - heights[b]);
+    if (!available.length) return null;
+    const rect = host.querySelector?.('video')?.getBoundingClientRect?.();
+    const css = rect?.width && rect?.height ? Math.min(rect.width, rect.height) : Math.min(window.innerWidth || 0, window.innerHeight || 0);
+    const target = Math.min(css * (window.devicePixelRatio || 1) * 0.9, AUTO_CAP);
+    return available.find(level => heights[level] >= target) || available[available.length - 1];
+  }
+  /** Pins [level]. The player ignores a range equal to its stored
+   *  preference (restored from localStorage on a fresh page), leaving the
+   *  360p it started on; nudging through a neighbour first forces the switch. */
+  function pin(host, level) {
+    if (typeof host.setPlaybackQualityRange === 'function') {
+      if (level !== 'default' && host.getPreferredQuality?.() === level && host.getPlaybackQuality?.() !== level) {
+        const other = levels(host).find(value => value !== level) || 'auto';
+        host.setPlaybackQualityRange(other, other);
+      }
+      host.setPlaybackQualityRange(level, level);
+    } else if (typeof host.setPlaybackQuality === 'function') host.setPlaybackQuality(level);
+    else return false;
+    return true;
+  }
+  /** Automatic mode pins the screen-derived level: an open-ended range only
+   *  applies from the next Short, a pin switches the playing one at once. */
+  function applyAuto(host) {
+    if (navigator.connection?.saveData) return true;
+    const level = floorLevel(host);
+    if (!level) return false;
+    try { return pin(host, level); } catch (_) { return false; }
+  }
   function apply(host, level) {
-    if (!host || (level !== 'default' && !levels(host).includes(level))) return false;
-    try {
-      if (typeof host.setPlaybackQualityRange === 'function') host.setPlaybackQualityRange(level, level);
-      else if (typeof host.setPlaybackQuality === 'function') host.setPlaybackQuality(level);
-      else return false;
-      return true;
-    } catch (_) { return false; }
+    if (level === 'default') return applyAuto(host);
+    if (!host || !levels(host).includes(level)) return false;
+    try { return pin(host, level); } catch (_) { return false; }
   }
   function close() {
     if (!panel) return;
@@ -98,10 +132,13 @@
     if (!isShorts()) { close(); document.querySelectorAll(mark).forEach(node => node.remove()); return true; }
     const host = player();
     if (panel && (panel.url !== location.pathname || panel.host !== host || !panel.container.isConnected)) close();
-    if (host && (host !== lastPlayer || location.pathname !== lastVideo)) {
+    if (host) {
+      // The level list fills in progressively after a Short starts; re-apply
+      // whenever it changes so an early partial list cannot pin a low level.
       const available = levels(host);
-      if (!preference || (available.length && apply(host, available.includes(preference) ? preference : 'default'))) {
-        lastPlayer = host; lastVideo = location.pathname;
+      const key = location.pathname + '|' + available.join();
+      if (available.length && key !== lastApplied && apply(host, available.includes(preference) ? preference : 'default')) {
+        lastApplied = key;
       }
     }
     return ensureRows();
