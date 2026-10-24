@@ -112,5 +112,5 @@ jobs:
           if gh release view "$TAG" >/dev/null 2>&1; then
             gh release upload "$TAG" dist/* --clobber
           else
-            gh release create "$TAG" dist/* --title "LitubeX $TAG" --notes "$notes" --prerelease
+            gh release create "$TAG" dist/* --title "LitubeX $TAG" --notes "$notes" --latest
           fi
