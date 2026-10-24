@@ -29,8 +29,8 @@ android {
         applicationId = "com.coomteng.litube"
         minSdk = 23
         targetSdk = 36
-        versionCode = 30306
-        versionName = "3.0.3.6"
+        versionCode = 30307
+        versionName = "3.0.3.7"
         buildConfigField("String", "FORK_REPO", "\"coomteng/Litube\"")
         buildConfigField("String", "DIAGNOSTIC_BUILD_ID", "\"$diagnosticBuildId\"")
         buildConfigField("String", "DIAGNOSTIC_DEPENDENCIES", "\"Media3=${libs.versions.media3.get()};OkHttp=${libs.versions.okhttp.get()};Gson=${libs.versions.gson.get()};NewPipe=${libs.newpipe.extractor.get().version}\"")
