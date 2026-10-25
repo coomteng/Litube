@@ -71,6 +71,7 @@ object WebViewFactory {
     private val coreScript = PageScript(CORE_JS, "Core")
     private val navScript = PageScript(NAV_JS, "Nav")
     private val uiScript = PageScript("script/ui.js", "Ui")
+    private val feedPrefetchScript = PageScript("script/feed-prefetch.js", "FeedPrefetch")
     private val playerHookScript = PageScript(PLAYER_HOOK_JS, "PlayerHook")
     private val dislikesScript = PageScript(DISLIKES_JS, "DisplayDislikes")
     private val hideShortsScript = PageScript(HIDE_SHORTS_JS, "HideShorts")
@@ -166,6 +167,7 @@ object WebViewFactory {
             extractor.installBrowserCapture(this) { bridge.pageOrigin().documentGeneration }
             coreScript.install(appContext, this)
             uiScript.install(appContext, this)
+            feedPrefetchScript.install(appContext, this)
             navScript.install(appContext, this)
             netTracer.install(appContext, this)
             innertube.install(appContext, this)
