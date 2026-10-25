@@ -11,6 +11,7 @@ import androidx.activity.compose.setContent
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -18,7 +19,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.core.content.FileProvider
-import com.google.gson.JsonParser
+import android.os.Build
+import android.text.format.Formatter
 import com.hhst.youtubelite.BuildConfig
 import com.hhst.youtubelite.R
 import com.hhst.youtubelite.diagnostics.AppLog
@@ -27,14 +29,18 @@ import com.hhst.youtubelite.diagnostics.Documents
 import com.hhst.youtubelite.extractor.Extractor
 import com.hhst.youtubelite.extractor.MemCache
 import com.hhst.youtubelite.ui.theme.AppTheme
+import com.hhst.youtubelite.update.UpdateInfo
+import com.hhst.youtubelite.update.UpdateInstaller
+import com.hhst.youtubelite.update.UpdateChecker
+import com.hhst.youtubelite.update.UpdateSchedule
 import com.tencent.mmkv.MMKV
 import java.io.File
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
-import okhttp3.Request
 import org.koin.java.KoinJavaComponent.get
 
 class AboutActivity : ComponentActivity() {
@@ -83,26 +89,84 @@ class AboutActivity : ComponentActivity() {
                     busy = false
                 }
             }
-            AboutScreen(applicationInfo.loadLabel(packageManager).toString(), version, { finish() }, busy, status,
-                onSource = { openUrl(SOURCE) },
-                onUpdate = { action("check_update") {
-                    val latest = withContext(Dispatchers.IO) {
-                        val request = Request.Builder().url("https://api.github.com/repos/${BuildConfig.FORK_REPO}/releases/latest")
-                            .header("Accept", "application/vnd.github+json").build()
-                        get<OkHttpClient>(OkHttpClient::class.java).newCall(request).execute().use { response ->
-                            check(response.isSuccessful) { "HTTP ${response.code}" }
-                            val body = response.body?.string() ?: error("Empty release response")
-                            val json = JsonParser.parseString(body).asJsonObject
-                            check(!json.get("prerelease").asBoolean && !json.get("draft").asBoolean)
-                            json.get("tag_name").asString
+            val checker = remember { UpdateChecker(get<OkHttpClient>(OkHttpClient::class.java)) }
+            val installer = remember { UpdateInstaller(this@AboutActivity, get<OkHttpClient>(OkHttpClient::class.java)) }
+            var update by remember { mutableStateOf<UpdateInfo?>(null) }
+            var progress by remember { mutableStateOf(-1f) }
+            var downloadJob by remember { mutableStateOf<Job?>(null) }
+            fun install() {
+                val info = update ?: return
+                if (busy) return
+                if (!installer.canInstall()) {
+                    status = getString(R.string.about_update_permission)
+                    runCatching { startActivity(installer.unknownSourcesIntent()) }
+                    return
+                }
+                busy = true; progress = 0f
+                status = getString(R.string.about_update_downloading, info.tag, 0)
+                downloadJob = scope.launch {
+                    val operation = AppLog.operation(AppLog.Category.APP, "install_update")
+                    var lastPercent = -1
+                    val result = runCatching {
+                        installer.download(info) { read, total ->
+                            val percent = if (total > 0) (read * 100 / total).toInt() else -1
+                            if (percent != lastPercent) {
+                                lastPercent = percent
+                                scope.launch {
+                                    progress = if (percent < 0) -1f else percent / 100f
+                                    status = if (percent >= 100) getString(R.string.about_update_verifying)
+                                    else getString(R.string.about_update_downloading, info.tag, percent.coerceAtLeast(0))
+                                }
+                            }
                         }
                     }
+                    result.onSuccess { apk ->
+                        operation.finish(DiagnosticOutcome.SUCCESS)
+                        status = getString(R.string.about_update_installer)
+                        runCatching { startActivity(installer.installIntent(apk)) }
+                            .onFailure { status = getString(R.string.about_operation_failed) }
+                    }.onFailure { failure ->
+                        operation.finish(if (failure is CancellationException) DiagnosticOutcome.CANCELLED else DiagnosticOutcome.FAILURE, "update_download_failed", failure)
+                        status = when (failure) {
+                            is CancellationException -> getString(R.string.about_save_cancelled)
+                            is UpdateInstaller.ChecksumMismatchException -> getString(R.string.about_update_checksum_failed)
+                            else -> getString(R.string.about_update_failed)
+                        }
+                    }
+                    progress = -1f; busy = false; downloadJob = null
+                }
+            }
+            // Auto-start when launched from the update dialog: check, then install.
+            LaunchedEffect(Unit) {
+                withContext(Dispatchers.IO) { installer.cleanup() }
+                if (intent.getBooleanExtra(EXTRA_START_UPDATE, false) && !busy) {
+                    intent.removeExtra(EXTRA_START_UPDATE)
+                    busy = true; status = getString(R.string.about_working)
+                    val result = runCatching { withContext(Dispatchers.IO) { checker.check(version, Build.SUPPORTED_ABIS.toList()) } }
+                    busy = false
+                    result.onSuccess {
+                        UpdateSchedule.noteChecked(it)
+                        update = it.update
+                        status = if (it.update != null) getString(R.string.about_update_available, it.latestTag) else getString(R.string.about_up_to_date, it.latestTag)
+                        if (it.update != null) install()
+                    }.onFailure { status = getString(R.string.about_operation_failed) }
+                }
+            }
+            AboutScreen(applicationInfo.loadLabel(packageManager).toString(), version, { finish() }, busy, status,
+                onSource = { openUrl(SOURCE) },
+                update = update, progress = progress,
+                onUpdate = { action("check_update") {
+                    val result = withContext(Dispatchers.IO) { checker.check(version, Build.SUPPORTED_ABIS.toList()) }
+                    UpdateSchedule.noteChecked(result)
+                    update = result.update?.takeUnless { StableVersion.isDevelopment(version) }
                     when {
-                        StableVersion.isDevelopment(version) -> getString(R.string.about_development_version, latest)
-                        StableVersion.isNewer(version, latest) -> getString(R.string.about_update_available, latest)
-                        else -> getString(R.string.about_up_to_date, latest)
+                        StableVersion.isDevelopment(version) -> getString(R.string.about_development_version, result.latestTag)
+                        result.update != null -> getString(R.string.about_update_available, result.latestTag)
+                        else -> getString(R.string.about_up_to_date, result.latestTag)
                     }
                 } },
+                onInstall = { install() },
+                onCancelDownload = { downloadJob?.cancel() },
                 onRelease = { openUrl("$SOURCE/releases/latest") },
                 onClear = { action("clear_cache") {
                     // clearCache removes HTTP cache only; cookies and WebStorage keep the account.
@@ -157,5 +221,11 @@ class AboutActivity : ComponentActivity() {
         runCatching { startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url))) }
             .onFailure { Toast.makeText(this, R.string.application_not_found, Toast.LENGTH_SHORT).show() }
     }
-    companion object { private const val SOURCE = "https://github.com/${BuildConfig.FORK_REPO}" }
+    companion object {
+        private const val SOURCE = "https://github.com/${BuildConfig.FORK_REPO}"
+        /** Boolean extra: check for the latest release and start downloading it immediately. */
+        const val EXTRA_START_UPDATE = "start_update"
+        fun sizeLabel(context: android.content.Context, bytes: Long): String =
+            if (bytes > 0) Formatter.formatShortFileSize(context, bytes) else "?"
+    }
 }

@@ -3,6 +3,7 @@
     <cache-path name="diagnostic_exports" path="diagnostic-exports/" />
     <cache-path name="gallery_share" path="gallery/" />
     <cache-path name="download_tmp" path="download/" />
+    <cache-path name="updates" path="updates/" />
     <files-path name="download_files" path="download/" />
     <external-files-path name="download_ext" path="Download/Litube Plus/" />
 </paths>
