@@ -24,13 +24,14 @@ android {
 
     defaultConfig {
         // Fork identity: a different application id so it installs side by side with upstream
-        // Litube (com.hhst.litube). Version = upstream version + ".N" fork revision;
-        // versionCode = upstream code * 100 + N, so both streams stay ordered.
+        // Litube (com.hhst.litube). Versions 3.0.3.N were upstream 3.0.3 plus a fork revision
+        // (versionCode = upstream code * 100 + N); from 3.1 the fork numbers itself, keeping
+        // versionCode = major*10000 + minor*1000 + patch*100 (+ hotfix) so the sequence stays ordered.
         applicationId = "com.coomteng.litube"
         minSdk = 23
         targetSdk = 36
-        versionCode = 30310
-        versionName = "3.0.3.10"
+        versionCode = 31000
+        versionName = "3.1"
         buildConfigField("String", "FORK_REPO", "\"coomteng/Litube\"")
         buildConfigField("String", "DIAGNOSTIC_BUILD_ID", "\"$diagnosticBuildId\"")
         buildConfigField("String", "DIAGNOSTIC_DEPENDENCIES", "\"Media3=${libs.versions.media3.get()};OkHttp=${libs.versions.okhttp.get()};Gson=${libs.versions.gson.get()};NewPipe=${libs.newpipe.extractor.get().version}\"")

@@ -11,9 +11,9 @@ Picture-in-Picture is available on Android 8.0 or later when the device supports
 
 ## Releases
 
-Versions are `<upstream>.<fork revision>`, e.g. 3.0.3.5 is upstream 3.0.3 plus five fork
-revisions. Signed release APKs for every ABI are attached to each
-[release](https://github.com/coomteng/litube_plus/releases):
+Up to 3.0.3.10 versions were `<upstream>.<fork revision>` (upstream 3.0.3 plus N fork
+revisions); from 3.1 the fork numbers its own releases. Signed release APKs for every ABI are
+attached to each [release](https://github.com/coomteng/litube_plus/releases):
 
 | file | what |
 |---|---|
@@ -23,9 +23,16 @@ revisions. Signed release APKs for every ABI are attached to each
 | `litube-plus-<ver>-x86_64-release.apk`, `-x86-` | emulators / Chromebooks |
 
 `SHA256SUMS.txt` lists every file. They are built by `.github/workflows/release.yml` on every
-`v*` tag and signed with this fork's own key; the app's About screen checks this repository
-for updates. [Obtainium](https://github.com/ImranR98/Obtainium) can track the repository
-URL directly.
+`v*` tag and signed with this fork's own key.
+
+**In-app updates.** Once a day the app asks this repository for a newer stable release and
+offers to install it (Settings → Interface → "Check for updates automatically" turns this
+off; "Skip this version" silences one release). About → "Check for stable updates" does the
+same on demand. The app downloads the APK for the device ABI, verifies it against
+`SHA256SUMS.txt` and hands it to the system installer — Android asks for the usual
+"install unknown apps" permission the first time. Nothing is installed without that
+confirmation. [Obtainium](https://github.com/ImranR98/Obtainium) can track the repository
+URL directly as an alternative.
 
 ## What Litube Plus changes
 
