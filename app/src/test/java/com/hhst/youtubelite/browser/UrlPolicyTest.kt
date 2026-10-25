@@ -34,4 +34,18 @@ class UrlPolicyTest {
         assertFalse(UrlPolicy.isAllowedUrl("https://example.com"))
         assertFalse(UrlPolicy.canLoad("https://evil.example"))
     }
+
+    @Test
+    fun externalLaunch_needsGestureAndWebOrIntentScheme() {
+        // Off-allowlist web link the user tapped: hand to the browser.
+        assertTrue(UrlPolicy.mayOpenExternally("https://example.com/x", hasGesture = true))
+        assertTrue(UrlPolicy.mayOpenExternally("intent://watch?v=a#Intent;scheme=vnd.youtube;end", hasGesture = true))
+        // Same links fired by script: swallowed.
+        assertFalse(UrlPolicy.mayOpenExternally("https://example.com/x", hasGesture = false))
+        assertFalse(UrlPolicy.mayOpenExternally("intent://x#Intent;end", hasGesture = false))
+        // Non-web schemes never leave the app, gesture or not.
+        for (url in listOf("market://details?id=x", "tel:+41000000000", "sms:1", "vnd.youtube:abc", "mailto:a@b", "file:///etc/hosts")) {
+            assertFalse(url, UrlPolicy.mayOpenExternally(url, hasGesture = true))
+        }
+    }
 }

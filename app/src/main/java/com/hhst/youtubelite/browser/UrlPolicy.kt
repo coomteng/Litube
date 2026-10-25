@@ -78,6 +78,20 @@ object UrlPolicy {
         "co.zm co.zw cat"
     ).split(' ').map { "accounts.google.$it" }
 
+    /**
+     * Whether a navigation the WebView will not load itself may be handed to
+     * another app. Only web links and `intent:` (YouTube's own app-handoff
+     * links) qualify, and only when a user gesture started the navigation:
+     * a page or ad must not be able to pop `market:`, `tel:` or a custom
+     * scheme on its own.
+     */
+    fun mayOpenExternally(url: String, hasGesture: Boolean): Boolean {
+        if (!hasGesture) return false
+        return schemeOf(url) in EXTERNAL_SCHEMES
+    }
+
+    private val EXTERNAL_SCHEMES = setOf("https", "http", "intent")
+
     private fun isYoutubeHost(host: String) = host == "youtube.com" || host.endsWith(".youtube.com")
 
     private fun isAllowedHost(host: String?): Boolean {

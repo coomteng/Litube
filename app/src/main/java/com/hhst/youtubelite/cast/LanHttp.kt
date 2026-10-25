@@ -4,6 +4,9 @@ import java.io.BufferedInputStream
 import java.io.ByteArrayOutputStream
 import java.io.IOException
 import java.io.InputStream
+import java.net.Inet4Address
+import java.net.Inet6Address
+import java.net.InetAddress
 import java.net.InetSocketAddress
 import java.net.Socket
 import java.net.URI
@@ -39,6 +42,12 @@ object LanHttp {
         if (!uri.scheme.equals("http", true)) throw IOException("LanHttp: only http:// is supported: $url")
         val host = uri.host ?: throw IOException("LanHttp: no host in $url")
         val port = if (uri.port > 0) uri.port else 80
+        // Every URL here came from an unauthenticated LAN packet (SSDP LOCATION,
+        // URLBase/controlURL, DIAL Application-URL). Resolve once and refuse
+        // anything outside the local network, or a peer could use the phone
+        // as a blind HTTP prober against the internet.
+        val address = InetAddress.getByName(host)
+        if (!isLanAddress(address)) throw IOException("LanHttp: not a LAN address: $host")
         val path = buildString {
             append(uri.rawPath?.takeIf { it.isNotEmpty() } ?: "/")
             uri.rawQuery?.let { append('?').append(it) }
@@ -47,7 +56,7 @@ object LanHttp {
         Socket().use { socket ->
             socket.soTimeout = readTimeoutMs
             socket.tcpNoDelay = true
-            socket.connect(InetSocketAddress(host, port), connectTimeoutMs)
+            socket.connect(InetSocketAddress(address, port), connectTimeoutMs)
             val head = StringBuilder()
             head.append(method).append(' ').append(path).append(" HTTP/1.1\r\n")
             head.append("Host: ").append(hostHeader).append("\r\n")
@@ -66,6 +75,14 @@ object LanHttp {
             return readResponse(BufferedInputStream(socket.getInputStream()))
         }
     }
+
+    /** Private (RFC 1918 / ULA), link-local, or loopback; everything else is off-limits. */
+    internal fun isLanAddress(address: InetAddress): Boolean =
+        address.isSiteLocalAddress || address.isLinkLocalAddress || address.isLoopbackAddress ||
+            // Java's isSiteLocalAddress covers only RFC 1918 and fec0::/10; IPv6 ULA fc00::/7 is separate.
+            (address is Inet6Address && (address.address[0].toInt() and 0xfe) == 0xfc) ||
+            // 100.64.0.0/10 (CGNAT) is in use on some home routers and Tailscale-style overlays.
+            (address is Inet4Address && address.address[0].toInt() == 100 && (address.address[1].toInt() and 0xc0) == 0x40)
 
     internal fun readResponse(input: InputStream): Response {
         val statusLine = readLine(input) ?: throw IOException("LanHttp: empty response")

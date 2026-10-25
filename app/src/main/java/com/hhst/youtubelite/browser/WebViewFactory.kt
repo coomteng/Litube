@@ -251,11 +251,12 @@ private class BrowserWebViewClient(
         if (!request.isForMainFrame) return false
         val uri = request.url
         val url = uri.toString()
-        if (uri.scheme.equals("intent", ignoreCase = true)) {
-            return openExternal(view.context, uri)
-        }
-        if (!UrlPolicy.canLoad(url)) {
-            return openExternal(view.context, uri)
+        if (uri.scheme.equals("intent", ignoreCase = true) || !UrlPolicy.canLoad(url)) {
+            // Returning true without launching swallows the navigation: the
+            // page stays where it is instead of loading an off-allowlist URL.
+            if (UrlPolicy.mayOpenExternally(url, request.hasGesture())) openExternal(view.context, uri)
+            else AppLog.event(AppLog.Category.BROWSER, "external_navigation_blocked", mapOf("scheme" to uri.scheme, "gesture" to request.hasGesture()), context = bridge.diagnosticContext())
+            return true
         }
         val current = view.url
         if (UrlPolicy.isTrafficChallenge(current) || UrlPolicy.isTrafficChallenge(url)) return false

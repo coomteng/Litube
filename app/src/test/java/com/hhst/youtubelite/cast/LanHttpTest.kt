@@ -3,9 +3,13 @@ package com.hhst.youtubelite.cast
 import okhttp3.mockwebserver.MockResponse
 import okhttp3.mockwebserver.MockWebServer
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.fail
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.ByteArrayInputStream
+import java.io.IOException
+import java.net.InetAddress
 
 class LanHttpTest {
 
@@ -57,6 +61,28 @@ class LanHttpTest {
             assertEquals("pairingCode=1", preq.body.readUtf8())
         } finally {
             server.shutdown()
+        }
+    }
+
+    @Test
+    fun lanAddress_privateLinkLocalLoopbackOnly() {
+        for (ip in listOf("10.0.0.1", "172.16.5.5", "172.31.255.1", "192.168.0.9", "169.254.1.1", "127.0.0.1", "100.64.0.1", "100.127.255.254",
+                          "fe80::1", "fc00::1", "fd12:3456::1", "::1")) {
+            assertTrue(ip, LanHttp.isLanAddress(InetAddress.getByName(ip)))
+        }
+        for (ip in listOf("8.8.8.8", "1.1.1.1", "172.32.0.1", "100.128.0.1", "100.63.255.255", "203.0.113.7", "2001:4860:4860::8888", "2606:4700::1")) {
+            assertFalse(ip, LanHttp.isLanAddress(InetAddress.getByName(ip)))
+        }
+    }
+
+    @Test
+    fun request_refusesPublicHostBeforeConnecting() {
+        // SSDP LOCATION pointing at the internet: must fail without a socket.
+        try {
+            LanHttp.get("http://203.0.113.7:8080/dd.xml", connectTimeoutMs = 50)
+            fail("expected refusal")
+        } catch (e: IOException) {
+            assertTrue(e.message, e.message!!.contains("not a LAN address"))
         }
     }
 }
