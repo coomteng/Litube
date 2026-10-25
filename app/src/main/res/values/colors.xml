@@ -9,5 +9,4 @@
     <color name="window_icon_color">#1D1B20</color>
     <color name="window_icon_variant">#49454F</color>
     <!-- Fork launcher background: upstream Litube uses white. -->
-    <color name="ic_launcher_background">#1C1C1E</color>
 </resources>
