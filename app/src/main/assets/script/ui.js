@@ -5,12 +5,28 @@
 
   const back = history.back;
   const go = history.go;
-  const MENU = 'bottom-sheet-layout,ytm-bottom-sheet-renderer,ytm-app-bottom-sheet-layout,ytm-menu-popup-renderer,.menu-content[role="dialog"]';
+  // sync() runs on every mutation batch while the feed scrolls, so the
+  // "is a sheet/search open" probe has to be cheap: querySelectorAll over
+  // custom tag names walks the whole document (≈1 ms per 3k nodes, ×4 per
+  // sync), while live getElementsByTagName collections and class selectors
+  // are indexed. Tags and class parts are therefore looked up separately.
+  const MENU_TAGS = ['bottom-sheet-layout', 'ytm-bottom-sheet-renderer', 'ytm-app-bottom-sheet-layout', 'ytm-menu-popup-renderer'];
+  const MENU_CLASS = '.menu-content[role="dialog"]';
   const ITEMS = 'ytm-menu-service-item-renderer,yt-list-item-view-model,toggleable-list-item-view-model,.bottom-sheet-media-menu-item,[data-injected="queue-item"]';
-  const SEARCH = 'ytm-searchbox,ytm-searchbox-renderer,.searchbox,ytm-search-suggestions-section';
+  const SEARCH_TAGS = ['ytm-searchbox', 'ytm-searchbox-renderer', 'ytm-search-suggestions-section'];
+  const SEARCH_CLASS = '.searchbox';
+  const menuTags = MENU_TAGS.map(tag => document.getElementsByTagName(tag));
+  const searchTags = SEARCH_TAGS.map(tag => document.getElementsByTagName(tag));
+  function candidates(collections, selector) {
+    const out = [];
+    for (const collection of collections) for (const node of collection) out.push(node);
+    if (selector) for (const node of document.querySelectorAll(selector)) out.push(node);
+    return out;
+  }
   let generation = null;
   let reported = null;
   let scheduled = false;
+  let shown = false;
 
   function visible(node) {
     if (!(node instanceof Element) || node.closest('[hidden],[aria-hidden="true"]')) return false;
@@ -20,12 +36,12 @@
   }
 
   function menu() {
-    return Array.from(document.querySelectorAll(MENU)).find(node => visible(node) && node.querySelector(ITEMS)) || null;
+    return candidates(menuTags, MENU_CLASS).find(node => visible(node) && node.querySelector(ITEMS)) || null;
   }
 
   function search() {
     const hash = /^#(?:searching|search)(?:[=&]|$)/.test(location.hash);
-    return Array.from(document.querySelectorAll(SEARCH)).find(node => visible(node) &&
+    return candidates(searchTags, SEARCH_CLASS).find(node => visible(node) &&
       (hash || node.contains(document.activeElement) && document.activeElement.matches('input'))) || null;
   }
 
@@ -33,11 +49,10 @@
     return menu() ? 'media_menu' : search() ? 'search' : 'none';
   }
 
-  function geometry() {
-    const sheet = menu();
+  function geometry(sheet, box) {
     const content = sheet?.querySelector('.menu-content,[role="dialog"]');
     const nodes = sheet ? content && visible(content) ? [content] : Array.from(sheet.querySelectorAll(ITEMS))
-      : search() ? Array.from(document.querySelectorAll(SEARCH)) : [];
+      : box ? candidates(searchTags, SEARCH_CLASS) : [];
     const regions = nodes.filter(visible).slice(0, 32).map(node => {
       const r = node.getBoundingClientRect();
       return [r.left, r.top, r.right, r.bottom].map(edge => Math.round(edge * 100) / 100);
@@ -51,8 +66,13 @@
     const bridge = Lite.bridge();
     if (!bridge || typeof bridge.setTransientUi !== 'function') return;
     if (generation === null) generation = bridge.currentDocumentGeneration();
-    const value = kind();
-    const bounds = geometry();
+    // One pass over the document: menu()/search() each walk the whole feed
+    // (≈5 ms at 100 cards), and sync runs on every mutation batch while scrolling.
+    const sheet = menu();
+    const box = sheet ? null : search();
+    const value = sheet ? 'media_menu' : box ? 'search' : 'none';
+    shown = value !== 'none';
+    const bounds = geometry(sheet, box);
     const stamp = value + bounds;
     if (reported === stamp) return;
     reported = stamp;
@@ -108,15 +128,36 @@
   }
 
   Lite.ui = { kind, dismiss, originalBack: () => back.call(history), originalGo: delta => go.call(history, delta) };
+  const CANDIDATE = [...MENU_TAGS, ...SEARCH_TAGS].join() + ',' + MENU_CLASS + ',' + SEARCH_CLASS;
+  /** A feed scroll produces ~20 mutation batches per second, nearly all
+   *  class flips on <img>/<span> as thumbnails lazy-load. A sheet or search
+   *  panel can only appear through an added element or an attribute change
+   *  on a node that is (or can contain) one; leaf attribute changes are
+   *  skipped unless something is already shown and needs re-measuring. */
+  function relevant(records) {
+    if (shown) return true;
+    for (const record of records) {
+      if (record.type !== 'attributes') {
+        for (const node of record.addedNodes) if (node.nodeType === 1) return true;
+        for (const node of record.removedNodes) if (node.nodeType === 1) return true;
+        continue;
+      }
+      const target = record.target;
+      if (target.firstElementChild || target.matches?.(CANDIDATE)) return true;
+    }
+    return false;
+  }
   function init() {
-    new MutationObserver(schedule).observe(document.documentElement, { childList: true, subtree: true, attributes: true,
-      attributeFilter: ['hidden', 'aria-hidden', 'class', 'style', 'open'] });
+    new MutationObserver(records => { if (relevant(records)) schedule(); }).observe(document.documentElement,
+      { childList: true, subtree: true, attributes: true, attributeFilter: ['hidden', 'aria-hidden', 'class', 'style', 'open'] });
     sync();
   }
   window.addEventListener('hashchange', schedule);
   window.addEventListener('popstate', schedule);
   window.addEventListener('resize', schedule);
-  document.addEventListener('scroll', schedule, true);
+  // Scrolling only moves an already-open sheet or search panel; opening one
+  // goes through the mutation observer, the hash, or focus.
+  document.addEventListener('scroll', () => { if (shown) schedule(); }, true);
   document.addEventListener('transitionend', schedule, true);
   document.addEventListener('animationend', schedule, true);
   window.addEventListener('tabVisibilityChanged', () => { reported = null; schedule(); });
