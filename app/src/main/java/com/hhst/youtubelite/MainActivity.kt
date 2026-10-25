@@ -40,6 +40,7 @@ import com.hhst.youtubelite.player.service.NotificationPermission
 import com.hhst.youtubelite.player.surface.PlayerUi
 import com.hhst.youtubelite.ui.browser.BrowserScreen
 import com.hhst.youtubelite.ui.theme.AppTheme
+import com.hhst.youtubelite.update.UpdatePrompt
 import kotlinx.coroutines.flow.MutableStateFlow
 import org.koin.android.ext.android.inject
 
@@ -168,6 +169,7 @@ class MainActivity : ComponentActivity() {
                             syncPipParams()
                         },
                     )
+                    UpdatePrompt()
                 }
             }
         }

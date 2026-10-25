@@ -22,6 +22,8 @@ object PreferenceKeys {
     const val REMEMBER_LAST_POSITION = "remember_last_position"
     const val REMEMBER_RESIZE_MODE = "remember_resize_mode"
     const val USE_ORIGINAL_TITLE = "use_original_title"
+    /** Daily GitHub release check with an install prompt (release builds only). */
+    const val AUTO_CHECK_UPDATES = "auto_check_updates"
 
     const val ENABLE_BACKGROUND_PLAY = "enable_background_play"
     const val ENABLE_PIP = "enable_pip"
@@ -79,6 +81,7 @@ object PreferenceKeys {
         ENABLE_DISPLAY_DISLIKES to true,
         ENABLE_SHOW_LIKES to true,
         ENABLE_HIDE_SHORTS to false,
+        AUTO_CHECK_UPDATES to true,
         SKIP_SPONSORS to true,
         SKIP_SELF_PROMO to true,
         SKIP_INTERACTION to true,

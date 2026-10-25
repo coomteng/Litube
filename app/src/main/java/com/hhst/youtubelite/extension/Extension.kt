@@ -40,6 +40,7 @@ data class Extension(
                         R.string.display_dislikes_summary,
                     ),
                     toggle(PreferenceKeys.ENABLE_HIDE_SHORTS, R.string.hide_shorts),
+                    toggle(PreferenceKeys.AUTO_CHECK_UPDATES, R.string.auto_check_updates, R.string.auto_check_updates_summary),
                 ),
             ),
             group(
