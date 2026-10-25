@@ -285,7 +285,10 @@ internal class HiddenJavascriptRuntime(
     override fun close() {
         pending.values.forEach { it.setException(IOException("JS_RUNTIME_CLOSED")) }
         pending.clear()
-        main.run { view?.removeJavascriptInterface("JsResult"); view?.destroy(); view = null }
+        main.run {
+            view?.let { timers.detach(it); it.removeJavascriptInterface("JsResult"); it.destroy() }
+            view = null
+        }
     }
 }
 

@@ -307,10 +307,11 @@ fun BrowserScreen(
             playerViewModel, onAddToQueue, onShowMediaItemMenu,
             onPlaylistPresence = onPlaylistPresence,
             onMicrophoneRequest = onMicrophoneRequest,
+            timers = webViewTimers,
         )
         delay(TAB_DESTROY_DELAY_MS)
         hosts.keys.filter { it !in liveTabIds }.forEach { id ->
-            hosts.remove(id)?.let { destroyHost(it) }
+            hosts.remove(id)?.let { destroyHost(it, webViewTimers) }
         }
     }
 
@@ -330,7 +331,7 @@ fun BrowserScreen(
             hosts[id] = createHost(
                 id, SHORTS_PREWARM_URL, context, viewModel, extensionManager, onOpenExtension,
                 onOpenDownloads, onOpenWith, onAbout, extractor, playerViewModel, onAddToQueue,
-                onShowMediaItemMenu, onPlaylistPresence, onMicrophoneRequest,
+                onShowMediaItemMenu, onPlaylistPresence, onMicrophoneRequest, webViewTimers,
             ).also {
                 // Not paused: the shell must finish hydrating (reel sequence,
                 // first item) while hidden. shorts.js keeps playback stopped on
@@ -455,7 +456,7 @@ fun BrowserScreen(
         onDispose {
             lifecycleOwner.lifecycle.removeObserver(observer)
             releaseTimers()
-            hosts.values.forEach { destroyHost(it) }
+            hosts.values.forEach { destroyHost(it, webViewTimers) }
             hosts.clear()
         }
     }
@@ -924,6 +925,7 @@ private fun createHosts(
     onShowMediaItemMenu: ((Bridge.QueueItemJson) -> Unit)? = null,
     onPlaylistPresence: ((Long, Boolean) -> Unit)? = null,
     onMicrophoneRequest: ((onResult: (Boolean) -> Unit) -> Unit)? = null,
+    timers: WebViewTimerOccupancy,
 ) {
     for (tab in tabs) {
         // A pre-warmed Shorts host (see the prewarm effect in BrowserScreen) is
@@ -932,7 +934,7 @@ private fun createHosts(
         hosts[tab.id] = createHost(
             tab.id, tab.url, context, viewModel, extensionManager, onOpenExtension, onOpenDownloads,
             onOpenWith, onAbout, extractor, playerHooks, onAddToQueue, onShowMediaItemMenu,
-            onPlaylistPresence, onMicrophoneRequest,
+            onPlaylistPresence, onMicrophoneRequest, timers,
         )
     }
 }
@@ -953,6 +955,7 @@ private fun createHost(
     onShowMediaItemMenu: ((Bridge.QueueItemJson) -> Unit)?,
     onPlaylistPresence: ((Long, Boolean) -> Unit)?,
     onMicrophoneRequest: ((onResult: (Boolean) -> Unit) -> Unit)?,
+    timers: WebViewTimerOccupancy,
 ): BrowserHost = WebViewFactory.create(
     context = context,
     callbacks = viewModel.callbacksFor(tabId),
@@ -975,13 +978,17 @@ private fun createHost(
     },
     onMicrophoneRequest = onMicrophoneRequest,
 ).also {
+    // Browser WebViews are the long-lived carriers for the process-global
+    // timer pause/resume; the PoToken WebView alone is reaped after idling.
+    timers.attach(it.webView)
     WebViewFactory.prepareBackground(it.webView, url)
     it.webView.loadUrl(url)
 }
 
-private fun destroyHost(host: BrowserHost) {
+private fun destroyHost(host: BrowserHost, timers: WebViewTimerOccupancy) {
     host.container.isRefreshing = false
     val webView: WebView = host.webView
+    timers.detach(webView)
     host.downloadBridge?.detach(webView)
     webView.stopLoading()
     webView.removeJavascriptInterface(Bridge.NAME)

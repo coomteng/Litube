@@ -10,7 +10,10 @@ import java.util.concurrent.atomic.AtomicBoolean
 interface WebViewTimerClock {
     fun pauseTimers()
     fun resumeTimers()
+    /** Registers a live WebView the global pause/resume may be routed through. */
     fun attach(host: Any) {}
+    /** Must precede `WebView.destroy()`; a destroyed carrier swallows the call. */
+    fun detach(host: Any) {}
 }
 
 enum class WebViewTimerOwner {
@@ -44,6 +47,7 @@ class WebViewTimerOccupancy(
         get() = synchronized(lock) { counts.values.sum() }
 
     fun attach(host: Any) = clock.attach(host)
+    fun detach(host: Any) = clock.detach(host)
 
     fun acquire(owner: WebViewTimerOwner): WebViewTimerHandle {
         val shouldResume: Boolean
