@@ -237,6 +237,54 @@ class ExtractorEpochTest {
         assertNull(inner.getStream(ID))
     }
 
+    /**
+     * A slow inner read (lazy session capture on a cold process) must not hold
+     * the per-video lock: the main thread's startExtraction takes the same
+     * lock from Bridge.play and froze for the whole capture.
+     */
+    @Test
+    fun epochGuard_slowStreamRead_doesNotBlockLockHolders() {
+        val readStarted = CountDownLatch(1)
+        val releaseRead = CountDownLatch(1)
+        val inner = object : RecordingCache() {
+            override fun getStream(videoId: String): Stream? {
+                readStarted.countDown()
+                releaseRead.await(5, TimeUnit.SECONDS)
+                return Stream()
+            }
+        }
+        val epochs = StreamEpochGuard()
+        val guarded = EpochGuardedCache(inner, ID, epochs.epochFor(ID), epochs)
+        val pool = Executors.newSingleThreadExecutor()
+        try {
+            val read = pool.submit<Stream?> { guarded.getStream(ID) }
+            assertTrue(readStarted.await(5, TimeUnit.SECONDS))
+            val waitedNs = System.nanoTime()
+            // Would deadlock-until-timeout if the read held the lock.
+            epochs.withLock(ID) { }
+            assertTrue("withLock waited on the slow read", System.nanoTime() - waitedNs < TimeUnit.SECONDS.toNanos(1))
+            releaseRead.countDown()
+            assertTrue(read.get(5, TimeUnit.SECONDS) != null)
+        } finally {
+            releaseRead.countDown()
+            pool.shutdownNow()
+        }
+    }
+
+    /** Read-then-validate still rejects a stream whose epoch moved during the read. */
+    @Test
+    fun epochGuard_readRacingInvalidation_isDropped() {
+        val epochs = StreamEpochGuard()
+        val inner = object : RecordingCache() {
+            override fun getStream(videoId: String): Stream? {
+                epochs.bump(videoId)
+                return Stream()
+            }
+        }
+        val guarded = EpochGuardedCache(inner, ID, epochs.epochFor(ID), epochs)
+        assertNull(guarded.getStream(ID))
+    }
+
     private companion object {
         const val ID = "dQw4w9WgXcQ"
     }

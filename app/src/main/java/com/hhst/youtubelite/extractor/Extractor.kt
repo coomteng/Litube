@@ -287,10 +287,14 @@ internal class EpochGuardedCache(
 ) : Cache by inner {
     override fun getStream(videoId: String): Stream? {
         if (videoId != id) return inner.getStream(videoId)
-        return epochs.withLock(id) {
-            if (epochs.epochFor(id) != epoch) null
-            else inner.getStream(videoId)
-        }
+        // Read first, validate after. The inner read may force lazy session
+        // capture (cookies, a www session page on a cold process: ~1 s) and
+        // must not run under the per-video lock: Bridge.play on the main
+        // thread takes the same lock in startExtraction and froze for the
+        // whole capture. Any invalidation that lands before the check bumps
+        // the epoch first, so a stale read is still rejected here.
+        val stream = inner.getStream(videoId)
+        return epochs.withLock(id) { if (epochs.epochFor(id) != epoch) null else stream }
     }
 
     override fun putStream(videoId: String, stream: Stream) {
