@@ -22,6 +22,11 @@ object AudioTrackIdentity {
     fun isOriginal(format: Format): Boolean = format.audioTrackOriginal ||
         format.audioTrackType.equals("original", ignoreCase = true)
 
+    /** YouTube's HLS rendition NAME carries the track kind: `… - original`, `… - dubbed-auto`. */
+    fun isOriginalLabel(label: String?): Boolean = label?.contains(originalLabel) == true
+    fun isDubbedLabel(label: String?): Boolean = label?.contains(dubbedLabel) == true
+    private val dubbedLabel = Regex("\\bdubbed(?:-auto)?\\b|配音|吹き替え|더빙", RegexOption.IGNORE_CASE)
+
     /** HLS may declare Original only in NAME, rather than its DEFAULT flag. */
     fun originalRenditionKey(entries: List<Pair<String?, String?>>, formats: List<Format> = emptyList()): String? {
         entries.firstOrNull { (_, label) ->
