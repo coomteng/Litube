@@ -400,7 +400,10 @@ private class BrowserWebViewClient(
         ).show()
     }
 
-    /** Pull-to-refresh only on pages without conflicting vertical gestures. */
+    /** Pull-to-refresh on feed and watch pages; Shorts own the vertical swipe. On watch the
+     *  native player keeps playing across the reload (PlayerViewModel.playVideo treats a new
+     *  document generation for the same video as a continuation), so a pull just refreshes the
+     *  page below the player: comments, recommendations, live chat. */
     private fun updateRefreshEnabled(url: String) {
         swipeRefresh.isEnabled = PageKind.of(url) in REFRESH_KINDS
     }
@@ -412,6 +415,7 @@ private class BrowserWebViewClient(
             Constants.PAGE_HOME,
             Constants.PAGE_SUBSCRIPTIONS,
             Constants.PAGE_LIBRARY,
+            Constants.PAGE_WATCH,
             "@",
         )
     }
