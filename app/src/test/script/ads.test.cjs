@@ -99,3 +99,14 @@ test('structural hiding runs without the page scheduler and hands over when the 
   control.textContent='Account';control.attributes.href='';p.mutate();assert.ok(!control.hidden());
   let registered=0;p.context.Lite={module:()=>registered++};p.tick();p.reinject();assert.equal(registered,1);
 });
+test('the topbar menu "Open app" row collapses as a whole, not just its button', () => {
+  // m.youtube.com's ⋮ menu is a list of <ytm-menu-item><button>; hiding only the button
+  // left a 48 px blank row between "YouTube data" and "Feedback".
+  const row = button('');
+  const promotion = button('打开应用');
+  promotion.closest = selector => selector.includes('ytm-menu-item') ? row : null;
+  const p = page([promotion]);
+  p.run();
+  assert.ok(row.hidden());
+  assert.equal(promotion.hidden(), false);
+});

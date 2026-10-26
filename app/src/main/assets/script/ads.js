@@ -46,7 +46,7 @@
   const hiddenPromotions = new WeakMap();
   const closingPromotions = new WeakMap();
   const dialogs = '[role="dialog"],ytm-dialog,tp-yt-paper-dialog,c3-dialog';
-  const rows = 'yt-list-item-view-model,ytm-menu-service-item-renderer,ytm-menu-navigation-item-renderer,ytm-compact-link-renderer';
+  const rows = 'yt-list-item-view-model,ytm-menu-service-item-renderer,ytm-menu-navigation-item-renderer,ytm-compact-link-renderer,ytm-menu-item';
   function appLink(href) {
     href = String(href || '').trim();
     if (!href || href[0] === '#') return false;
